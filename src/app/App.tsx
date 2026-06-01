@@ -7,16 +7,16 @@ import LoginPage from './components/auth/LoginPage';
 import RegisterPage from './components/auth/RegisterPage';
 import ForgotPasswordPage from './components/auth/ForgotPasswordPage';
 
-import Sidebar from './components/Sidebar';
-import Dashboard from './components/Dashboard';
-import FloorManagement from './components/FloorManagement';
-import RoomManagement from './components/RoomManagement';
-import InvoiceManagement from './components/InvoiceManagement';
-import TenantManagement from './components/TenantManagement';
-import ContractManagement from './components/ContractManagement';
-import MeterReading from './components/MeterReading';
-import MaintenanceRequests from './components/MaintenanceRequests';
-import Settings from './components/Settings';
+import Sidebar from './components/landlord/Sidebar';
+import Dashboard from './components/landlord/Dashboard';
+import FloorManagement from './components/landlord/FloorManagement';
+import RoomManagement from './components/landlord/RoomManagement';
+import InvoiceManagement from './components/landlord/InvoiceManagement';
+import TenantManagement from './components/landlord/TenantManagement';
+import ContractManagement from './components/landlord/ContractManagement';
+import MeterReading from './components/landlord/MeterReading';
+import MaintenanceRequests from './components/landlord/MaintenanceRequests';
+import Settings from './components/landlord/Settings';
 
 import TenantDashboard from './components/tenant/TenantDashboard';
 import TenantInvoices from './components/tenant/TenantInvoices';

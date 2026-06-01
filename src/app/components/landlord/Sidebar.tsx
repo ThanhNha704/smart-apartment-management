@@ -13,7 +13,7 @@ import {
   Wrench,
   LogOut
 } from 'lucide-react';
-import { useAuth } from '../contexts/AuthContext';
+import { useAuth } from '../../contexts/AuthContext';
 import { toast } from 'sonner';
 
 interface SidebarProps {
