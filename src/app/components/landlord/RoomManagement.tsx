@@ -1,5 +1,7 @@
 import { useState } from 'react';
-import { Plus, Search, Filter, Edit, Trash2, Users, DoorOpen } from 'lucide-react';
+import { Plus, Search, 
+  // Filter, 
+  Edit, Trash2, Users, DoorOpen } from 'lucide-react';
 import * as Dialog from '@radix-ui/react-dialog';
 import { toast } from 'sonner';
 

@@ -1,5 +1,8 @@
 import { Building2, Users, DollarSign, AlertCircle, TrendingUp, TrendingDown } from 'lucide-react';
-import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
+import { 
+  // BarChart, 
+  // Bar, 
+  LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 
 const statsData = [
   { label: 'Tổng phòng', value: '48', change: '+2', icon: Building2, color: 'blue' },

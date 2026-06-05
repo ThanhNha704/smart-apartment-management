@@ -1,8 +1,9 @@
-import { createContext, useContext, useState, ReactNode } from 'react';
+import { createContext, useContext, useState, type ReactNode } from 'react';
 
 interface User {
   id: string;
   email: string;
+  password: string;
   name: string;
   role: 'landlord' | 'tenant';
   phone?: string;
@@ -40,6 +41,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const mockUser: User = {
       id: '1',
       email,
+      password,
       name: role === 'landlord' ? 'Chủ nhà' : 'Nguyễn Văn A',
       role,
       phone: '0901234567',
@@ -56,6 +58,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const mockUser: User = {
       id: Math.random().toString(36).substr(2, 9),
       email: data.email,
+      password: data.password,
       name: data.name,
       role: data.role,
       phone: data.phone,

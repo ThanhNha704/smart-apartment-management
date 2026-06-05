@@ -52,7 +52,7 @@ const initialReadings: Reading[] = [
 ];
 
 export default function MeterReading() {
-  const [readings, setReadings] = useState<Reading[]>(initialReadings);
+  const [readings] = useState<Reading[]>(initialReadings);
   const [selectedRoom, setSelectedRoom] = useState('');
   const [meterType, setMeterType] = useState<'electricity' | 'water'>('electricity');
   const [currentValue, setCurrentValue] = useState('');
