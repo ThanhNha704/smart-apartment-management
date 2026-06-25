@@ -16,6 +16,23 @@ interface Contract {
   paymentDay: number;
 }
 
+// Mock data giả lập kết quả từ GetAll Users (Người thuê)
+const mockTenants = [
+  { id: 'u1', name: 'Nguyễn Văn A' },
+  { id: 'u2', name: 'Trần Thị B' },
+  { id: 'u3', name: 'Lê Văn C' },
+  { id: 'u4', name: 'Phạm Văn D' },
+];
+
+// Mock data giả lập kết quả từ GetAll Rooms (Phòng) đi kèm sẵn giá thuê & cọc mặc định của phòng đó
+const mockRooms = [
+  { id: 'r1', name: 'P101', price: 2500000, deposit: 5000000 },
+  { id: 'r2', name: 'P102', price: 2500000, deposit: 5000000 },
+  { id: 'r3', name: 'P103', price: 2800000, deposit: 5600000 },
+  { id: 'r4', name: 'P201', price: 3000000, deposit: 6000000 },
+  { id: 'r5', name: 'P202', price: 3000000, deposit: 6000000 },
+];
+
 const initialContracts: Contract[] = [
   {
     id: '1',
@@ -61,23 +78,20 @@ export default function ContractManagement() {
   const [filterStatus, setFilterStatus] = useState<string>('all');
   const [selectedContract, setSelectedContract] = useState<Contract | null>(null);
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+  
   const [createFormData, setCreateFormData] = useState({
+    contractNumber: '',
     tenant: '',
-    tenantPhone: '',
-    tenantEmail: '',
-    tenantId: '',
     room: '',
     startDate: '',
-    duration: 12,
-    monthlyRent: 2500000,
-    deposit: 5000000,
+    endDate: '',
     paymentDay: 5,
   });
 
   const filteredContracts = contracts.filter(contract => {
     const matchesSearch = contract.contractNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         contract.tenant.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         contract.room.toLowerCase().includes(searchTerm.toLowerCase());
+                          contract.tenant.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                          contract.room.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesFilter = filterStatus === 'all' || contract.status === filterStatus;
     return matchesSearch && matchesFilter;
   });
@@ -108,19 +122,21 @@ export default function ContractManagement() {
 
   const handleCreateContract = (e: React.FormEvent) => {
     e.preventDefault();
-    const startDate = new Date(createFormData.startDate);
-    const endDate = new Date(startDate);
-    endDate.setMonth(endDate.getMonth() + createFormData.duration);
+
+    // Tìm dữ liệu phòng được chọn để tự động map thông tin giá thuê và tiền cọc gắn liền với phòng đó
+    const selectedRoomData = mockRooms.find(r => r.name === createFormData.room);
+    const monthlyRent = selectedRoomData ? selectedRoomData.price : 0;
+    const deposit = selectedRoomData ? selectedRoomData.deposit : 0;
 
     const newContract: Contract = {
       id: String(contracts.length + 1),
-      contractNumber: `HD-2026-${String(contracts.length + 1).padStart(3, '0')}`,
+      contractNumber: createFormData.contractNumber,
       tenant: createFormData.tenant,
       room: createFormData.room,
       startDate: createFormData.startDate,
-      endDate: endDate.toISOString().split('T')[0],
-      monthlyRent: createFormData.monthlyRent,
-      deposit: createFormData.deposit,
+      endDate: createFormData.endDate,
+      monthlyRent: monthlyRent,
+      deposit: deposit,
       status: 'active',
       paymentDay: createFormData.paymentDay,
     };
@@ -129,15 +145,11 @@ export default function ContractManagement() {
     toast.success('Đã tạo hợp đồng thành công!');
     setIsCreateDialogOpen(false);
     setCreateFormData({
+      contractNumber: '',
       tenant: '',
-      tenantPhone: '',
-      tenantEmail: '',
-      tenantId: '',
       room: '',
       startDate: '',
-      duration: 12,
-      monthlyRent: 2500000,
-      deposit: 5000000,
+      endDate: '',
       paymentDay: 5,
     });
   };
@@ -327,105 +339,25 @@ export default function ContractManagement() {
         </Dialog.Portal>
       </Dialog.Root>
 
-      {/* Dialog Tạo hợp đồng */}
+      {/* Dialog Tạo hợp đồng mới */}
       <Dialog.Root open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
         <Dialog.Portal>
           <Dialog.Overlay className="fixed inset-0 bg-black/50" />
           <Dialog.Content className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-white rounded-lg p-6 w-full max-w-2xl max-h-[90vh] overflow-auto">
             <Dialog.Title className="text-xl font-semibold mb-4">Tạo hợp đồng mới</Dialog.Title>
             <form className="space-y-4" onSubmit={handleCreateContract}>
+              
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium mb-1">Họ và tên người thuê</label>
+                  <label className="block text-sm font-medium mb-1">Số hợp đồng</label>
                   <input
                     type="text"
-                    value={createFormData.tenant}
-                    onChange={(e) => setCreateFormData({...createFormData, tenant: e.target.value})}
+                    value={createFormData.contractNumber}
+                    onChange={(e) => setCreateFormData({...createFormData, contractNumber: e.target.value})}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    placeholder="Nguyễn Văn A"
+                    placeholder="Ví dụ: HD-2026-005"
                     required
                   />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium mb-1">Số điện thoại</label>
-                  <input
-                    type="tel"
-                    value={createFormData.tenantPhone}
-                    onChange={(e) => setCreateFormData({...createFormData, tenantPhone: e.target.value})}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    placeholder="0901234567"
-                    required
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium mb-1">Email</label>
-                  <input
-                    type="email"
-                    value={createFormData.tenantEmail}
-                    onChange={(e) => setCreateFormData({...createFormData, tenantEmail: e.target.value})}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    placeholder="email@example.com"
-                    required
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium mb-1">CMND/CCCD</label>
-                  <input
-                    type="text"
-                    value={createFormData.tenantId}
-                    onChange={(e) => setCreateFormData({...createFormData, tenantId: e.target.value})}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    placeholder="001234567890"
-                    required
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium mb-1">Phòng</label>
-                  <select
-                    value={createFormData.room}
-                    onChange={(e) => setCreateFormData({...createFormData, room: e.target.value})}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    required
-                  >
-                    <option value="">-- Chọn phòng --</option>
-                    <option value="P101">P101</option>
-                    <option value="P102">P102</option>
-                    <option value="P103">P103</option>
-                    <option value="P201">P201</option>
-                    <option value="P202">P202</option>
-                    <option value="P301">P301</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium mb-1">Ngày bắt đầu</label>
-                  <input
-                    type="date"
-                    value={createFormData.startDate}
-                    onChange={(e) => setCreateFormData({...createFormData, startDate: e.target.value})}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    required
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium mb-1">Thời hạn hợp đồng</label>
-                  <select
-                    value={createFormData.duration}
-                    onChange={(e) => setCreateFormData({...createFormData, duration: Number(e.target.value)})}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  >
-                    <option value={6}>6 tháng</option>
-                    <option value={12}>12 tháng</option>
-                    <option value={24}>24 tháng</option>
-                  </select>
                 </div>
                 <div>
                   <label className="block text-sm font-medium mb-1">Ngày thanh toán hàng tháng</label>
@@ -443,39 +375,73 @@ export default function ContractManagement() {
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium mb-1">Tiền thuê/tháng (VNĐ)</label>
+                  <label className="block text-sm font-medium mb-1">Chọn người thuê</label>
+                  <select
+                    value={createFormData.tenant}
+                    onChange={(e) => setCreateFormData({...createFormData, tenant: e.target.value})}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    required
+                  >
+                    <option value="">-- Chọn khách thuê --</option>
+                    {mockTenants.map((t) => (
+                      <option key={t.id} value={t.name}>{t.name}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1">Chọn phòng</label>
+                  <select
+                    value={createFormData.room}
+                    onChange={(e) => setCreateFormData({...createFormData, room: e.target.value})}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    required
+                  >
+                    <option value="">-- Chọn phòng --</option>
+                    {mockRooms.map((r) => (
+                      <option key={r.id} value={r.name}>{r.name}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium mb-1">Ngày bắt đầu</label>
                   <input
-                    type="number"
-                    value={createFormData.monthlyRent}
-                    onChange={(e) => setCreateFormData({...createFormData, monthlyRent: Number(e.target.value)})}
+                    type="date"
+                    value={createFormData.startDate}
+                    onChange={(e) => setCreateFormData({...createFormData, startDate: e.target.value})}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                     required
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium mb-1">Tiền đặt cọc (VNĐ)</label>
+                  <label className="block text-sm font-medium mb-1">Ngày kết thúc (EndDate)</label>
                   <input
-                    type="number"
-                    value={createFormData.deposit}
-                    onChange={(e) => setCreateFormData({...createFormData, deposit: Number(e.target.value)})}
+                    type="date"
+                    value={createFormData.endDate}
+                    onChange={(e) => setCreateFormData({...createFormData, endDate: e.target.value})}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                     required
                   />
                 </div>
               </div>
 
-              <div className="p-4 bg-blue-50 rounded-lg">
-                <h4 className="font-medium text-blue-900 mb-2">Thông tin tổng hợp</h4>
-                <div className="space-y-1 text-sm text-blue-800">
-                  <p>• Thời hạn: {createFormData.duration} tháng</p>
-                  <p>• Thanh toán: Ngày {createFormData.paymentDay} hàng tháng</p>
-                  <p>• Tiền thuê: {createFormData.monthlyRent.toLocaleString('vi-VN')} ₫/tháng</p>
-                  <p>• Tiền cọc: {createFormData.deposit.toLocaleString('vi-VN')} ₫</p>
-                  <p className="font-semibold pt-2 border-t border-blue-200">
-                    Tổng thanh toán lần đầu: {(createFormData.monthlyRent + createFormData.deposit).toLocaleString('vi-VN')} ₫
-                  </p>
+              {/* Khối hiển thị thông tin phòng tự động (Ăn theo phòng được chọn) */}
+              {createFormData.room && (
+                <div className="p-4 bg-blue-50 rounded-lg">
+                  <h4 className="font-medium text-blue-900 mb-2">Giá trị mặc định theo phòng:</h4>
+                  {mockRooms.filter(r => r.name === createFormData.room).map(room => (
+                    <div key={room.id} className="space-y-1 text-sm text-blue-800">
+                      <p>• Tiền phòng/Tháng: <span className="font-semibold">{room.price.toLocaleString('vi-VN')} ₫</span></p>
+                      <p>• Tiền cọc giữ chỗ: <span className="font-semibold">{room.deposit.toLocaleString('vi-VN')} ₫</span></p>
+                      <p className="font-semibold pt-2 border-t border-blue-200 text-blue-900">
+                        Tổng cộng phải thu lần đầu: {(room.price + room.deposit).toLocaleString('vi-VN')} ₫
+                      </p>
+                    </div>
+                  ))}
                 </div>
-              </div>
+              )}
 
               <div className="flex gap-2 pt-4">
                 <Dialog.Close className="flex-1 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50">

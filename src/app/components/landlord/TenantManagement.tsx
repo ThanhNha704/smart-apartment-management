@@ -13,6 +13,7 @@ interface Tenant {
   moveInDate: string;
   depositAmount: number;
   monthlyRent: number;
+  password?: string;
   status: 'active' | 'moving-out' | 'expired';
 }
 
@@ -149,7 +150,7 @@ export default function TenantManagement() {
           <div key={tenant.id} className="bg-white rounded-lg border border-gray-200 p-5 hover:shadow-lg transition-shadow">
             <div className="flex items-start justify-between mb-4">
               <div className="flex items-center gap-3">
-                <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-blue-600 rounded-full flex items-center justify-center text-white font-semibold">
+                <div className="w-12 h-12 bg-linear-to-br from-blue-500 to-blue-600 rounded-full flex items-center justify-center text-white font-semibold">
                   {tenant.name.charAt(0)}
                 </div>
                 <div>
@@ -257,7 +258,35 @@ export default function TenantManagement() {
                     placeholder="Căn cước công dân"
                   />
                 </div>
+                {/* Mật khẩu */}
                 <div>
+                  <label className="block text-sm font-medium mb-1">Mật khẩu
+                    <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="password"
+                    required
+                    value={newTenant.password}
+                    onChange={(e) => setNewTenant({ ...newTenant, password: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="Nhập mật khẩu"
+                  />
+                </div>
+                {/* <div>
+                  <label className="block text-sm font-medium mb-1">Nhập lại mật khẩu
+                    <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="password"
+                    required
+                    value={newTenant.password}
+                    onChange={(e) => setNewTenant({ ...newTenant, password: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="Nhập lại mật khẩu"
+                  />
+                </div> */}
+                {/* Phòng */}
+                {/* <div>
                   <label className="block text-sm font-medium mb-1">Phòng <span className="text-red-500">*</span></label>
                   <input
                     type="text"
@@ -267,8 +296,9 @@ export default function TenantManagement() {
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                     placeholder="Ví dụ: P101"
                   />
-                </div>
-                <div>
+                </div> */}
+                {/* Ngày nhận phòng */}
+                {/* <div>
                   <label className="block text-sm font-medium mb-1">Ngày nhận phòng</label>
                   <input
                     type="date"
@@ -276,8 +306,9 @@ export default function TenantManagement() {
                     onChange={(e) => setNewTenant({ ...newTenant, moveInDate: e.target.value })}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
-                </div>
-                <div>
+                </div> */}
+                {/* Tiền đặt cọc */}
+                {/* <div>
                   <label className="block text-sm font-medium mb-1">Tiền đặt cọc (VNĐ)</label>
                   <input
                     type="number"
@@ -286,8 +317,9 @@ export default function TenantManagement() {
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                     placeholder="0"
                   />
-                </div>
-                <div>
+                </div> */}
+                {/* Tiền thuê */}
+                {/* <div>
                   <label className="block text-sm font-medium mb-1">Tiền thuê/tháng (VNĐ)</label>
                   <input
                     type="number"
@@ -296,7 +328,7 @@ export default function TenantManagement() {
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                     placeholder="0"
                   />
-                </div>
+                </div> */}
               </div>
 
               <div className="flex gap-2 pt-4 border-t border-gray-200">
