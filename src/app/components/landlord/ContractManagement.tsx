@@ -1,173 +1,225 @@
-import { useState } from 'react';
-import { Search, Plus, FileText, Download, Eye, CheckCircle, Clock, XCircle } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Search, Plus, FileText, Download, Eye, CheckCircle, Clock, XCircle, Calendar } from 'lucide-react';
 import * as Dialog from '@radix-ui/react-dialog';
 import { toast } from 'sonner';
 
-interface Contract {
+const API_BASE_URL = 'http://localhost:5000/api';
+
+// --- ĐỊNH NGHĨA INTERFACES THEO BACKEND ---
+interface ContractBackend {
   id: string;
+  createdAt: string;
+  updatedAt: string;
   contractNumber: string;
-  tenant: string;
-  room: string;
+  roomNumber: string;
+  tenantName: string;
   startDate: string;
   endDate: string;
-  monthlyRent: number;
-  deposit: number;
-  status: 'active' | 'expiring' | 'expired';
-  paymentDay: number;
+  paymentDate: number;
+  paymentDateLabel: string;
+  price: number;
+  roomDeposit: number;
+  status: number; // 0, 1, 2... tùy theo enum backend
+  statusLabel: string; // "Đang hiệu lực", "Hết hạn",... ăn theo backend trả ra
+  remainTime: number; // Số ngày còn lại backend tính sẵn
 }
 
-// Mock data giả lập kết quả từ GetAll Users (Người thuê)
-const mockTenants = [
-  { id: 'u1', name: 'Nguyễn Văn A' },
-  { id: 'u2', name: 'Trần Thị B' },
-  { id: 'u3', name: 'Lê Văn C' },
-  { id: 'u4', name: 'Phạm Văn D' },
-];
-
-// Mock data giả lập kết quả từ GetAll Rooms (Phòng) đi kèm sẵn giá thuê & cọc mặc định của phòng đó
-const mockRooms = [
-  { id: 'r1', name: 'P101', price: 2500000, deposit: 5000000 },
-  { id: 'r2', name: 'P102', price: 2500000, deposit: 5000000 },
-  { id: 'r3', name: 'P103', price: 2800000, deposit: 5600000 },
-  { id: 'r4', name: 'P201', price: 3000000, deposit: 6000000 },
-  { id: 'r5', name: 'P202', price: 3000000, deposit: 6000000 },
-];
-
-const initialContracts: Contract[] = [
-  {
-    id: '1',
-    contractNumber: 'HD-2025-001',
-    tenant: 'Nguyễn Văn A',
-    room: 'P101',
-    startDate: '2025-01-15',
-    endDate: '2026-01-14',
-    monthlyRent: 2500000,
-    deposit: 5000000,
-    status: 'active',
-    paymentDay: 5,
-  },
-  {
-    id: '2',
-    contractNumber: 'HD-2025-002',
-    tenant: 'Trần Thị B',
-    room: 'P103',
-    startDate: '2025-03-01',
-    endDate: '2026-03-01',
-    monthlyRent: 2800000,
-    deposit: 5600000,
-    status: 'active',
-    paymentDay: 1,
-  },
-  {
-    id: '3',
-    contractNumber: 'HD-2024-015',
-    tenant: 'Lê Văn C',
-    room: 'P201',
-    startDate: '2024-11-20',
-    endDate: '2025-11-19',
-    monthlyRent: 3000000,
-    deposit: 6000000,
-    status: 'expiring',
-    paymentDay: 20,
-  },
-];
+interface CreateContractInput {
+  contractNumber: string;
+  roomNumber: string;
+  tenantName: string;
+  startDate: string;
+  endDate: string;
+  paymentDate: number;
+  monthlyRent: number;
+}
 
 export default function ContractManagement() {
-  const [contracts, setContracts] = useState<Contract[]>(initialContracts);
+  const [contracts, setContracts] = useState<ContractBackend[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState<string>('all');
-  const [selectedContract, setSelectedContract] = useState<Contract | null>(null);
-  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   
-  const [createFormData, setCreateFormData] = useState({
+  // Trạng thái Dialog Chi tiết
+  const [selectedContract, setSelectedContract] = useState<ContractBackend | null>(null);
+  
+  // Trạng thái Dialog Tạo mới
+  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+  const [createFormData, setCreateFormData] = useState<CreateContractInput>({
     contractNumber: '',
-    tenant: '',
-    room: '',
+    roomNumber: '',
+    tenantName: '',
     startDate: '',
     endDate: '',
-    paymentDay: 5,
+    paymentDate: 5,
+    monthlyRent: 0,
   });
 
+  // Trạng thái Dialog Gia hạn
+  const [isExtendDialogOpen, setIsExtendDialogOpen] = useState(false);
+  const [extendEndDate, setExtendEndDate] = useState('');
+
+  // 1. Fetch danh sách hợp đồng (GET /api/Contracts)
+  const fetchContracts = async () => {
+    try {
+      setIsLoading(true);
+      const response = await fetch(`${API_BASE_URL}/Contracts`);
+      if (!response.ok) throw new Error('Không thể tải danh sách hợp đồng');
+      const data: ContractBackend[] = await response.json();
+      setContracts(data);
+    } catch (error) {
+      toast.error('Lỗi khi kết nối đến máy chủ hợp đồng!');
+      console.error(error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchContracts();
+  }, []);
+
+  // 2. Xem chi tiết hợp đồng (GET /api/Contracts/{id})
+  const handleViewDetails = async (id: string) => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/Contracts/${id}`);
+      if (!response.ok) throw new Error('Không thể tải chi tiết hợp đồng');
+      const detailData: ContractBackend = await response.json();
+      setSelectedContract(detailData);
+    } catch (error) {
+      toast.error('Không thể lấy thông tin chi tiết hợp đồng!');
+      console.error(error);
+    }
+  };
+
+  // 3. Tạo hợp đồng mới (POST /api/Contracts)
+  const handleCreateContract = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      const response = await fetch(`${API_BASE_URL}/Contracts`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(createFormData),
+      });
+
+      if (!response.ok) throw new Error('Tạo hợp đồng thất bại');
+      
+      toast.success('Đã tạo hợp đồng mới thành công!');
+      setIsCreateDialogOpen(false);
+      // Reset form
+      setCreateFormData({
+        contractNumber: '',
+        roomNumber: '',
+        tenantName: '',
+        startDate: '',
+        endDate: '',
+        paymentDate: 5,
+        monthlyRent: 0,
+      });
+      fetchContracts(); // Reload danh sách
+    } catch (error) {
+      toast.error('Lỗi khi tạo hợp đồng mới!');
+      console.error(error);
+    }
+  };
+
+  // 4. Thanh lý/Hủy hợp đồng (PUT /api/Contracts/{id}/terminate)
+  const handleTerminateContract = async (id: string) => {
+    if (!window.confirm('Bạn có chắc chắn muốn thanh lý hợp đồng này không?')) return;
+    try {
+      const response = await fetch(`${API_BASE_URL}/Contracts/${id}/terminate`, {
+        method: 'PUT',
+      });
+      if (!response.ok) throw new Error('Thanh lý hợp đồng thất bại');
+
+      toast.success('Đã hoàn tất thanh lý hợp đồng!');
+      setSelectedContract(null); // Đóng modal chi tiết nếu đang mở
+      fetchContracts(); // Reload danh sách
+    } catch (error) {
+      toast.error('Gặp lỗi khi thanh lý hợp đồng!');
+      console.error(error);
+    }
+  };
+
+  // 5. Gia hạn hợp đồng (PUT /api/Contracts/{id}/extend)
+  const handleExtendContract = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedContract || !extendEndDate) return;
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/Contracts/${selectedContract.id}/extend`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(extendEndDate), // Truyền chuỗi DateTime ISO
+      });
+
+      if (!response.ok) throw new Error('Gia hạn hợp đồng thất bại');
+
+      toast.success('Gia hạn hợp đồng thành công!');
+      setIsExtendDialogOpen(false);
+      setSelectedContract(null);
+      setExtendEndDate('');
+      fetchContracts(); // Reload danh sách
+    } catch (error) {
+      toast.error('Gặp lỗi khi gia hạn hợp đồng!');
+      console.error(error);
+    }
+  };
+
+  // --- LOGIC LỌC & TÌM KIẾM TRÊN CLIENT ---
   const filteredContracts = contracts.filter(contract => {
-    const matchesSearch = contract.contractNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                          contract.tenant.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                          contract.room.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesFilter = filterStatus === 'all' || contract.status === filterStatus;
+    const matchesSearch = 
+      contract.contractNumber?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      contract.tenantName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      contract.roomNumber?.toLowerCase().includes(searchTerm.toLowerCase());
+    
+    const matchesFilter = filterStatus === 'all' || String(contract.status) === filterStatus;
     return matchesSearch && matchesFilter;
   });
 
-  const getStatusBadge = (status: string) => {
-    const configs = {
-      active: { icon: CheckCircle, label: 'Đang hiệu lực', className: 'bg-green-100 text-green-700' },
-      expiring: { icon: Clock, label: 'Sắp hết hạn', className: 'bg-orange-100 text-orange-700' },
-      expired: { icon: XCircle, label: 'Hết hạn', className: 'bg-red-100 text-red-700' },
-    };
-    const config = configs[status as keyof typeof configs];
-    const Icon = config.icon;
+  // Gắn màu sắc Badge động dựa vào nhãn trạng thái từ backend
+  const getStatusBadge = (statusLabel: string, status: number) => {
+    let className = 'bg-purple-100 text-purple-700';
+    let Icon = Clock;
+
+    if (statusLabel?.toLowerCase().includes('hiệu lực') || status === 0) {
+      className = 'bg-green-100 text-green-700';
+      Icon = CheckCircle;
+    } else if (statusLabel?.toLowerCase().includes('hết hạn') || status === 1) {
+      className = 'bg-red-100 text-red-700';
+      Icon = XCircle;
+    } else if (statusLabel?.toLowerCase().includes('sắp') || statusLabel?.toLowerCase().includes('chờ')) {
+      className = 'bg-orange-100 text-orange-700';
+      Icon = Clock;
+    }
+
     return (
-      <span className={`flex items-center gap-1 px-3 py-1 rounded-full text-sm ${config.className}`}>
+      <span className={`flex items-center gap-1 px-3 py-1 rounded-full text-sm font-medium ${className}`}>
         <Icon className="w-4 h-4" />
-        {config.label}
+        {statusLabel || 'Không rõ'}
       </span>
     );
   };
 
-  const getRemainingDays = (endDate: string) => {
-    const end = new Date(endDate);
-    const today = new Date();
-    const diffTime = end.getTime() - today.getTime();
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-    return diffDays;
-  };
-
-  const handleCreateContract = (e: React.FormEvent) => {
-    e.preventDefault();
-
-    // Tìm dữ liệu phòng được chọn để tự động map thông tin giá thuê và tiền cọc gắn liền với phòng đó
-    const selectedRoomData = mockRooms.find(r => r.name === createFormData.room);
-    const monthlyRent = selectedRoomData ? selectedRoomData.price : 0;
-    const deposit = selectedRoomData ? selectedRoomData.deposit : 0;
-
-    const newContract: Contract = {
-      id: String(contracts.length + 1),
-      contractNumber: createFormData.contractNumber,
-      tenant: createFormData.tenant,
-      room: createFormData.room,
-      startDate: createFormData.startDate,
-      endDate: createFormData.endDate,
-      monthlyRent: monthlyRent,
-      deposit: deposit,
-      status: 'active',
-      paymentDay: createFormData.paymentDay,
-    };
-
-    setContracts([newContract, ...contracts]);
-    toast.success('Đã tạo hợp đồng thành công!');
-    setIsCreateDialogOpen(false);
-    setCreateFormData({
-      contractNumber: '',
-      tenant: '',
-      room: '',
-      startDate: '',
-      endDate: '',
-      paymentDay: 5,
-    });
-  };
+  if (isLoading) {
+    return <div className="p-6 text-center text-gray-500">Đang tải danh sách hợp đồng từ backend...</div>;
+  }
 
   return (
     <div className="p-6 max-w-7xl mx-auto">
       <div className="mb-6">
         <h1 className="text-2xl font-semibold mb-1">Quản lý hợp đồng</h1>
-        <p className="text-gray-600">Quản lý hợp đồng thuê phòng và theo dõi thời hạn</p>
+        <p className="text-gray-600">Theo dõi thông tin, tạo mới và gia hạn các hợp đồng thuê phòng</p>
       </div>
 
+      {/* Bộ lọc & Tìm kiếm */}
       <div className="bg-white rounded-lg border border-gray-200 mb-6 p-4">
         <div className="flex flex-col md:flex-row gap-4">
           <div className="flex-1 relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
             <input
               type="text"
-              placeholder="Tìm kiếm hợp đồng, phòng, người thuê..."
+              placeholder="Tìm kiếm theo mã HĐ, tên phòng, người thuê..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -177,16 +229,15 @@ export default function ContractManagement() {
             <select
               value={filterStatus}
               onChange={(e) => setFilterStatus(e.target.value)}
-              className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
             >
               <option value="all">Tất cả trạng thái</option>
-              <option value="active">Đang hiệu lực</option>
-              <option value="expiring">Sắp hết hạn</option>
-              <option value="expired">Hết hạn</option>
+              <option value="0">Đang hiệu lực</option>
+              <option value="1">Hết hạn</option>
             </select>
             <button
               onClick={() => setIsCreateDialogOpen(true)}
-              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center gap-2"
+              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center gap-2 transition-colors"
             >
               <Plus className="w-5 h-5" />
               Tạo hợp đồng
@@ -195,12 +246,15 @@ export default function ContractManagement() {
         </div>
       </div>
 
+      {/* Danh sách thẻ hợp đồng */}
       <div className="grid grid-cols-1 gap-4">
-        {filteredContracts.map((contract) => {
-          const remainingDays = getRemainingDays(contract.endDate);
-
-          return (
-            <div key={contract.id} className="bg-white rounded-lg border border-gray-200 p-5 hover:shadow-lg transition-shadow">
+        {filteredContracts.length === 0 ? (
+          <div className="text-center py-10 text-gray-500 border border-dashed rounded-lg bg-white">
+            Không tìm thấy hợp đồng nào phù hợp.
+          </div>
+        ) : (
+          filteredContracts.map((contract) => (
+            <div key={contract.id} className="bg-white rounded-lg border border-gray-200 p-5 hover:shadow-md transition-all">
               <div className="flex items-start justify-between mb-4">
                 <div className="flex items-center gap-3">
                   <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
@@ -208,128 +262,128 @@ export default function ContractManagement() {
                   </div>
                   <div>
                     <h3 className="font-semibold text-lg">{contract.contractNumber}</h3>
-                    <p className="text-sm text-gray-600">{contract.tenant} - {contract.room}</p>
+                    <p className="text-sm text-gray-600">Khách thuê: <span className="font-medium text-gray-900">{contract.tenantName}</span> • Phòng: <span className="font-medium text-gray-900">{contract.roomNumber}</span></p>
                   </div>
                 </div>
-                {getStatusBadge(contract.status)}
+                {getStatusBadge(contract.statusLabel, contract.status)}
               </div>
 
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4 text-sm">
                 <div>
-                  <p className="text-xs text-gray-600 mb-1">Ngày bắt đầu</p>
+                  <p className="text-xs text-gray-500 mb-0.5">Ngày bắt đầu</p>
                   <p className="font-medium">{new Date(contract.startDate).toLocaleDateString('vi-VN')}</p>
                 </div>
                 <div>
-                  <p className="text-xs text-gray-600 mb-1">Ngày kết thúc</p>
+                  <p className="text-xs text-gray-500 mb-0.5">Ngày kết thúc</p>
                   <p className="font-medium">{new Date(contract.endDate).toLocaleDateString('vi-VN')}</p>
                 </div>
                 <div>
-                  <p className="text-xs text-gray-600 mb-1">Tiền thuê/tháng</p>
-                  <p className="font-medium text-blue-600">{contract.monthlyRent.toLocaleString('vi-VN')} ₫</p>
+                  <p className="text-xs text-gray-500 mb-0.5">Tiền thuê/tháng</p>
+                  <p className="font-medium text-blue-600">{contract.price.toLocaleString('vi-VN')} ₫</p>
                 </div>
                 <div>
-                  <p className="text-xs text-gray-600 mb-1">Tiền cọc</p>
-                  <p className="font-medium">{contract.deposit.toLocaleString('vi-VN')} ₫</p>
+                  <p className="text-xs text-gray-500 mb-0.5">Tiền đặt cọc</p>
+                  <p className="font-medium text-gray-800">{contract.roomDeposit.toLocaleString('vi-VN')} ₫</p>
                 </div>
               </div>
 
-              {contract.status === 'expiring' && (
-                <div className="mb-4 p-3 bg-orange-50 border border-orange-200 rounded-lg">
-                  <p className="text-sm text-orange-800">
-                    ⚠️ Hợp đồng sẽ hết hạn sau <span className="font-semibold">{remainingDays} ngày</span>. Liên hệ để gia hạn.
-                  </p>
+              {/* Cảnh báo thời gian còn lại (remainTime) */}
+              {contract.remainTime <= 30 && contract.remainTime > 0 && (
+                <div className="mb-4 p-3 bg-orange-50 border border-orange-200 rounded-lg text-sm text-orange-800">
+                  ⚠️ Hợp đồng sắp hết hạn! Còn lại <span className="font-semibold">{contract.remainTime} ngày</span>.
                 </div>
               )}
 
               <div className="flex gap-2 pt-4 border-t border-gray-100">
                 <button
-                  onClick={() => setSelectedContract(contract)}
-                  className="flex-1 px-3 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 flex items-center justify-center gap-2 text-sm"
+                  onClick={() => handleViewDetails(contract.id)}
+                  className="flex-1 px-3 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 flex items-center justify-center gap-2 text-sm text-gray-700 transition-colors"
                 >
                   <Eye className="w-4 h-4" />
                   Xem chi tiết
                 </button>
-                <button className="flex-1 px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center justify-center gap-2 text-sm">
+                <button className="px-3 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 flex items-center justify-center gap-2 text-sm text-gray-700 transition-colors">
                   <Download className="w-4 h-4" />
-                  Tải hợp đồng
                 </button>
               </div>
             </div>
-          );
-        })}
+          ))
+        )}
       </div>
 
+      {/* --- DIALOG CHI TIẾT HỢP ĐỒNG --- */}
       <Dialog.Root open={selectedContract !== null} onOpenChange={(open) => !open && setSelectedContract(null)}>
         <Dialog.Portal>
-          <Dialog.Overlay className="fixed inset-0 bg-black/50" />
-          <Dialog.Content className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-white rounded-lg p-6 w-full max-w-2xl max-h-[90vh] overflow-auto">
+          <Dialog.Overlay className="fixed inset-0 bg-black/40 z-40 transition-opacity" />
+          <Dialog.Content className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-white rounded-lg p-6 w-full max-w-2xl max-h-[90vh] overflow-auto z-50 shadow-xl">
             {selectedContract && (
               <>
-                <Dialog.Title className="text-xl font-semibold mb-4">Chi tiết hợp đồng</Dialog.Title>
-                <div className="space-y-4">
-                  <div className="grid grid-cols-2 gap-4">
+                <Dialog.Title className="text-xl font-bold mb-4 flex items-center justify-between">
+                  <span>Hợp đồng: {selectedContract.contractNumber}</span>
+                  {getStatusBadge(selectedContract.statusLabel, selectedContract.status)}
+                </Dialog.Title>
+                
+                <div className="space-y-4 text-sm">
+                  <div className="grid grid-cols-2 gap-4 bg-gray-50 p-4 rounded-lg border border-gray-100">
                     <div>
-                      <p className="text-sm text-gray-600">Mã hợp đồng</p>
-                      <p className="font-medium">{selectedContract.contractNumber}</p>
+                      <p className="text-xs text-gray-500">Khách thuê phòng</p>
+                      <p className="font-semibold text-base text-gray-900">{selectedContract.tenantName}</p>
                     </div>
                     <div>
-                      <p className="text-sm text-gray-600">Trạng thái</p>
-                      <div className="mt-1">{getStatusBadge(selectedContract.status)}</div>
+                      <p className="text-xs text-gray-500">Mã / Số phòng</p>
+                      <p className="font-semibold text-base text-gray-900">Phòng {selectedContract.roomNumber}</p>
                     </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-y-3 gap-x-4">
                     <div>
-                      <p className="text-sm text-gray-600">Người thuê</p>
-                      <p className="font-medium">{selectedContract.tenant}</p>
-                    </div>
-                    <div>
-                      <p className="text-sm text-gray-600">Phòng</p>
-                      <p className="font-medium">{selectedContract.room}</p>
-                    </div>
-                    <div>
-                      <p className="text-sm text-gray-600">Ngày bắt đầu</p>
+                      <p className="text-gray-500">Ngày bắt đầu hợp đồng</p>
                       <p className="font-medium">{new Date(selectedContract.startDate).toLocaleDateString('vi-VN')}</p>
                     </div>
                     <div>
-                      <p className="text-sm text-gray-600">Ngày kết thúc</p>
+                      <p className="text-gray-500">Ngày kết thúc dự kiến</p>
                       <p className="font-medium">{new Date(selectedContract.endDate).toLocaleDateString('vi-VN')}</p>
                     </div>
                     <div>
-                      <p className="text-sm text-gray-600">Tiền thuê/tháng</p>
-                      <p className="font-medium text-blue-600">{selectedContract.monthlyRent.toLocaleString('vi-VN')} ₫</p>
+                      <p className="text-gray-500">Chu kỳ đóng tiền phòng</p>
+                      <p className="font-medium">{selectedContract.paymentDateLabel || `Ngày ${selectedContract.paymentDate} hàng tháng`}</p>
                     </div>
                     <div>
-                      <p className="text-sm text-gray-600">Tiền đặt cọc</p>
-                      <p className="font-medium">{selectedContract.deposit.toLocaleString('vi-VN')} ₫</p>
+                      <p className="text-gray-500">Thời gian còn lại</p>
+                      <p className="font-medium text-orange-600">{selectedContract.remainTime} ngày</p>
                     </div>
                     <div>
-                      <p className="text-sm text-gray-600">Ngày thanh toán</p>
-                      <p className="font-medium">Ngày {selectedContract.paymentDay} hàng tháng</p>
+                      <p className="text-gray-500">Mức tiền thuê hàng tháng</p>
+                      <p className="font-semibold text-blue-600 text-base">{selectedContract.price.toLocaleString('vi-VN')} ₫</p>
                     </div>
                     <div>
-                      <p className="text-sm text-gray-600">Thời hạn còn lại</p>
-                      <p className="font-medium">{getRemainingDays(selectedContract.endDate)} ngày</p>
+                      <p className="text-gray-500">Tiền cọc giữ chỗ (Room Deposit)</p>
+                      <p className="font-semibold text-gray-800 text-base">{selectedContract.roomDeposit.toLocaleString('vi-VN')} ₫</p>
                     </div>
                   </div>
 
-                  <div className="p-4 bg-gray-50 rounded-lg">
-                    <h4 className="font-medium mb-2">Điều khoản hợp đồng</h4>
-                    <ul className="text-sm text-gray-700 space-y-1">
-                      <li>• Thanh toán tiền phòng trước ngày {selectedContract.paymentDay} hàng tháng</li>
-                      <li>• Không được chuyển nhượng hợp đồng cho người khác</li>
-                      <li>• Thông báo trước 1 tháng khi muốn trả phòng</li>
-                      <li>• Giữ gìn vệ sinh và cơ sở vật chất phòng</li>
-                      <li>• Tuân thủ nội quy chung của tòa nhà</li>
-                    </ul>
+                  <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg text-xs text-blue-800">
+                    <p className="mb-1 font-medium">Hệ thống ghi nhận:</p>
+                    <p>• Khởi tạo ngày: {new Date(selectedContract.createdAt).toLocaleString('vi-VN')}</p>
+                    <p>• Cập nhật lần cuối: {new Date(selectedContract.updatedAt).toLocaleString('vi-VN')}</p>
                   </div>
 
-                  <div className="flex gap-2 pt-4">
-                    <Dialog.Close className="flex-1 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50">
-                      Đóng
+                  {/* Thanh công cụ hành động kết nối API Terminate & Extend */}
+                  <div className="flex gap-2 pt-4 border-t border-gray-200">
+                    <Dialog.Close className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 font-medium transition-colors">
+                      Đóng UI
                     </Dialog.Close>
-                    <button className="flex-1 px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700">
-                      Gia hạn hợp đồng
+                    <button 
+                      onClick={() => handleTerminateContract(selectedContract.id)}
+                      className="px-4 py-2 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 font-medium transition-colors ml-auto"
+                    >
+                      Thanh lý hợp đồng
                     </button>
-                    <button className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
-                      Tải hợp đồng
+                    <button 
+                      onClick={() => setIsExtendDialogOpen(true)}
+                      className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium flex items-center gap-1 transition-colors"
+                    >
+                      <Calendar className="w-4 h-4" /> Gia hạn
                     </button>
                   </div>
                 </div>
@@ -339,32 +393,91 @@ export default function ContractManagement() {
         </Dialog.Portal>
       </Dialog.Root>
 
-      {/* Dialog Tạo hợp đồng mới */}
+      {/* --- DIALOG GIA HẠN HỢP ĐỒNG (Chạy lồng) --- */}
+      <Dialog.Root open={isExtendDialogOpen} onOpenChange={setIsExtendDialogOpen}>
+        <Dialog.Portal>
+          <Dialog.Overlay className="fixed inset-0 bg-black/40 z-50" />
+          <Dialog.Content className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-white rounded-lg p-6 w-full max-w-md z-50 shadow-2xl">
+            <Dialog.Title className="text-lg font-bold mb-3">Gia hạn hợp đồng mới</Dialog.Title>
+            <form onSubmit={handleExtendContract} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium mb-1 text-gray-700">Chọn ngày kết thúc mới (EndDate)</label>
+                <input
+                  type="date"
+                  value={extendEndDate}
+                  onChange={(e) => setExtendEndDate(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                  required
+                />
+              </div>
+              <div className="flex gap-2 justify-end pt-2">
+                <button 
+                  type="button" 
+                  onClick={() => setIsExtendDialogOpen(false)}
+                  className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 text-sm"
+                >
+                  Hủy
+                </button>
+                <button type="submit" className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm font-medium">
+                  Xác nhận gia hạn
+                </button>
+              </div>
+            </form>
+          </Dialog.Content>
+        </Dialog.Portal>
+      </Dialog.Root>
+
+      {/* --- DIALOG TẠO HỢP ĐỒNG MỚI (POST) --- */}
       <Dialog.Root open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
         <Dialog.Portal>
-          <Dialog.Overlay className="fixed inset-0 bg-black/50" />
-          <Dialog.Content className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-white rounded-lg p-6 w-full max-w-2xl max-h-[90vh] overflow-auto">
-            <Dialog.Title className="text-xl font-semibold mb-4">Tạo hợp đồng mới</Dialog.Title>
-            <form className="space-y-4" onSubmit={handleCreateContract}>
-              
+          <Dialog.Overlay className="fixed inset-0 bg-black/40 z-40" />
+          <Dialog.Content className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-white rounded-lg p-6 w-full max-w-2xl max-h-[90vh] overflow-auto z-40 shadow-xl">
+            <Dialog.Title className="text-xl font-bold mb-4">Tạo hợp đồng thuê phòng mới</Dialog.Title>
+            
+            <form className="space-y-4 text-sm" onSubmit={handleCreateContract}>
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium mb-1">Số hợp đồng</label>
+                  <label className="block font-medium mb-1 text-gray-700">Số hợp đồng</label>
                   <input
                     type="text"
                     value={createFormData.contractNumber}
                     onChange={(e) => setCreateFormData({...createFormData, contractNumber: e.target.value})}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    placeholder="Ví dụ: HD-2026-005"
+                    placeholder="Ví dụ: HD-2026-009"
                     required
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium mb-1">Ngày thanh toán hàng tháng</label>
+                  <label className="block font-medium mb-1 text-gray-700">Tên khách thuê</label>
+                  <input
+                    type="text"
+                    value={createFormData.tenantName}
+                    onChange={(e) => setCreateFormData({...createFormData, tenantName: e.target.value})}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="Nhập họ và tên người thuê"
+                    required
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block font-medium mb-1 text-gray-700">Số / Mã phòng</label>
+                  <input
+                    type="text"
+                    value={createFormData.roomNumber}
+                    onChange={(e) => setCreateFormData({...createFormData, roomNumber: e.target.value})}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="Ví dụ: P102"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block font-medium mb-1 text-gray-700">Ngày đóng tiền hàng tháng</label>
                   <input
                     type="number"
-                    value={createFormData.paymentDay}
-                    onChange={(e) => setCreateFormData({...createFormData, paymentDay: Number(e.target.value)})}
+                    value={createFormData.paymentDate}
+                    onChange={(e) => setCreateFormData({...createFormData, paymentDate: Number(e.target.value)})}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                     min="1"
                     max="31"
@@ -375,38 +488,7 @@ export default function ContractManagement() {
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium mb-1">Chọn người thuê</label>
-                  <select
-                    value={createFormData.tenant}
-                    onChange={(e) => setCreateFormData({...createFormData, tenant: e.target.value})}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    required
-                  >
-                    <option value="">-- Chọn khách thuê --</option>
-                    {mockTenants.map((t) => (
-                      <option key={t.id} value={t.name}>{t.name}</option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium mb-1">Chọn phòng</label>
-                  <select
-                    value={createFormData.room}
-                    onChange={(e) => setCreateFormData({...createFormData, room: e.target.value})}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    required
-                  >
-                    <option value="">-- Chọn phòng --</option>
-                    {mockRooms.map((r) => (
-                      <option key={r.id} value={r.name}>{r.name}</option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium mb-1">Ngày bắt đầu</label>
+                  <label className="block font-medium mb-1 text-gray-700">Ngày bắt đầu ở</label>
                   <input
                     type="date"
                     value={createFormData.startDate}
@@ -416,7 +498,7 @@ export default function ContractManagement() {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium mb-1">Ngày kết thúc (EndDate)</label>
+                  <label className="block font-medium mb-1 text-gray-700">Ngày kết thúc hợp đồng</label>
                   <input
                     type="date"
                     value={createFormData.endDate}
@@ -427,28 +509,24 @@ export default function ContractManagement() {
                 </div>
               </div>
 
-              {/* Khối hiển thị thông tin phòng tự động (Ăn theo phòng được chọn) */}
-              {createFormData.room && (
-                <div className="p-4 bg-blue-50 rounded-lg">
-                  <h4 className="font-medium text-blue-900 mb-2">Giá trị mặc định theo phòng:</h4>
-                  {mockRooms.filter(r => r.name === createFormData.room).map(room => (
-                    <div key={room.id} className="space-y-1 text-sm text-blue-800">
-                      <p>• Tiền phòng/Tháng: <span className="font-semibold">{room.price.toLocaleString('vi-VN')} ₫</span></p>
-                      <p>• Tiền cọc giữ chỗ: <span className="font-semibold">{room.deposit.toLocaleString('vi-VN')} ₫</span></p>
-                      <p className="font-semibold pt-2 border-t border-blue-200 text-blue-900">
-                        Tổng cộng phải thu lần đầu: {(room.price + room.deposit).toLocaleString('vi-VN')} ₫
-                      </p>
-                    </div>
-                  ))}
-                </div>
-              )}
+              <div>
+                <label className="block font-medium mb-1 text-gray-700">Tiền phòng/tháng (₫)</label>
+                <input
+                  type="number"
+                  value={createFormData.monthlyRent || ''}
+                  onChange={(e) => setCreateFormData({...createFormData, monthlyRent: Number(e.target.value)})}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="Nhập giá phòng thuê"
+                  required
+                />
+              </div>
 
               <div className="flex gap-2 pt-4">
-                <Dialog.Close className="flex-1 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50">
-                  Hủy
+                <Dialog.Close type="button" className="flex-1 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
+                  Hủy bỏ
                 </Dialog.Close>
-                <button type="submit" className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
-                  Tạo hợp đồng
+                <button type="submit" className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium transition-colors">
+                  Tạo hợp đồng (Lưu DB)
                 </button>
               </div>
             </form>
