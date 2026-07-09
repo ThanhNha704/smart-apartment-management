@@ -24,15 +24,17 @@ import TenantMaintenance from './components/tenant/TenantMaintenance';
 import TenantProfile from './components/tenant/TenantProfile';
 import TenantBottomNav from './components/tenant/TenantBottomNav';
 
-function ProtectedRoute({ children, role }: { children: React.ReactNode; role?: 'landlord' | 'tenant' }) {
+// 1. Sửa lại kiểu dữ liệu role: 0 là Landlord, 1 là Tenant theo Swagger API
+function ProtectedRoute({ children, role }: { children: React.ReactNode; role?: 0 | 1 }) {
   const { isAuthenticated, user } = useAuth();
 
   if (!isAuthenticated) {
     return <Navigate to="/login" replace />;
   }
 
-  if (role && user?.role !== role) {
-    if (user?.role === 'landlord') {
+  // Nếu route yêu cầu quyền cụ thể nhưng quyền của user không khớp
+  if (role !== undefined && user?.role !== role) {
+    if (user?.role === 0 || user?.roleLabel === 'Landlord') {
       return <Navigate to="/dashboard" replace />;
     } else {
       return <Navigate to="/tenant/dashboard" replace />;
@@ -82,25 +84,32 @@ function TenantLayout() {
 function AppRoutes() {
   const { isAuthenticated, user } = useAuth();
 
+  // Hàm helper kiểm tra nhanh xem user hiện tại có phải chủ nhà không
+  const isLandlord = user?.role === 0 || user?.roleLabel === 'Landlord';
+
   return (
     <Routes>
-      <Route path="/login" element={isAuthenticated ? <Navigate to={user?.role === 'landlord' ? '/dashboard' : '/tenant/dashboard'} replace /> : <LoginPage />} />
-      <Route path="/register" element={isAuthenticated ? <Navigate to={user?.role === 'landlord' ? '/dashboard' : '/tenant/dashboard'} replace /> : <RegisterPage />} />
-      <Route path="/forgot-password" element={isAuthenticated ? <Navigate to={user?.role === 'landlord' ? '/dashboard' : '/tenant/dashboard'} replace /> : <ForgotPasswordPage />} />
+      {/* 2. Cập nhật logic chuyển hướng tự động tại các trang Auth */}
+      <Route path="/login" element={isAuthenticated ? <Navigate to={isLandlord ? '/dashboard' : '/tenant/dashboard'} replace /> : <LoginPage />} />
+      <Route path="/register" element={isAuthenticated ? <Navigate to={isLandlord ? '/dashboard' : '/tenant/dashboard'} replace /> : <RegisterPage />} />
+      <Route path="/forgot-password" element={isAuthenticated ? <Navigate to={isLandlord ? '/dashboard' : '/tenant/dashboard'} replace /> : <ForgotPasswordPage />} />
 
-      <Route path="/*" element={
-        <ProtectedRoute role="landlord">
-          <LandlordLayout />
-        </ProtectedRoute>
-      } />
-
+      {/* Route dành riêng cho người thuê (Tenant - role: 1) */}
       <Route path="/tenant/*" element={
-        <ProtectedRoute role="tenant">
+        <ProtectedRoute role={1}>
           <TenantLayout />
         </ProtectedRoute>
       } />
 
-      <Route path="/" element={<Navigate to={isAuthenticated ? (user?.role === 'landlord' ? '/dashboard' : '/tenant/dashboard') : '/login'} replace />} />
+      {/* Route dành riêng cho chủ nhà (Landlord - role: 0) */}
+      <Route path="/*" element={
+        <ProtectedRoute role={0}>
+          <LandlordLayout />
+        </ProtectedRoute>
+      } />
+
+      {/* Route mặc định "/" */}
+      <Route path="/" element={<Navigate to={isAuthenticated ? (isLandlord ? '/dashboard' : '/tenant/dashboard') : '/login'} replace />} />
     </Routes>
   );
 }

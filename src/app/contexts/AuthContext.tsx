@@ -2,32 +2,36 @@ import { createContext, useContext, useState, type ReactNode } from 'react';
 
 interface User {
   id: string;
-  email: string;
-  password: string;
   name: string;
-  role: 'landlord' | 'tenant';
-  phone?: string;
-  room?: string;
+  email: string;
+  phoneNumber: string;
+  role: number;
+  roleLabel: string;
+  roomNumber: string | null;
+  token: string;
+  refreshToken: string;
+}
+
+interface RegisterData {
+  name: string;
+  email: string;
+  phoneNumber: string;
+  password: string;
+  confirmPassword: string;
+  role: number;
 }
 
 interface AuthContextType {
   user: User | null;
   isAuthenticated: boolean;
-  login: (email: string, password: string, role: 'landlord' | 'tenant') => Promise<void>;
+  login: (email: string, password: string) => Promise<User>;
   register: (data: RegisterData) => Promise<void>;
-  logout: () => void;
-}
-
-interface RegisterData {
-  email: string;
-  password: string;
-  name: string;
-  phone: string;
-  role: 'landlord' | 'tenant';
-  room?: string;
+  logout: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
+
+export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(() => {
@@ -35,43 +39,68 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return savedUser ? JSON.parse(savedUser) : null;
   });
 
-  const login = async (email: string, password: string, role: 'landlord' | 'tenant') => {
-    await new Promise(resolve => setTimeout(resolve, 1000));
+  const login = async (email: string, password: string): Promise<User> => {
+    const response = await fetch(`${API_BASE_URL}/Auth/login`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ 
+        email: email.trim(), 
+        password: password.trim() 
+      }),
+    });
 
-    const mockUser: User = {
-      id: '1',
-      email,
-      password,
-      name: role === 'landlord' ? 'Chủ nhà' : 'Nguyễn Văn A',
-      role,
-      phone: '0901234567',
-      room: role === 'tenant' ? 'P101' : undefined,
-    };
+    if (!response.ok) {
+      const errorData = await response.text();
+      throw new Error(errorData || 'Đăng nhập thất bại');
+    }
 
-    setUser(mockUser);
-    localStorage.setItem('user', JSON.stringify(mockUser));
+    const userData: User = await response.json();
+    setUser(userData);
+    localStorage.setItem('user', JSON.stringify(userData));
+    localStorage.setItem('token', userData.token);
+
+    return userData;
   };
 
-  const register = async (data: RegisterData) => {
-    await new Promise(resolve => setTimeout(resolve, 1000));
+  const register = async (data: RegisterData): Promise<void> => {
+    const response = await fetch(`${API_BASE_URL}/Auth/register`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(data),
+    });
 
-    const mockUser: User = {
-      id: Math.random().toString(36).substr(2, 9),
-      email: data.email,
-      password: data.password,
-      name: data.name,
-      role: data.role,
-      phone: data.phone,
-      room: data.room,
-    };
+    if (!response.ok) {
+      const errorData = await response.text();
+      throw new Error(errorData || 'Đăng ký thất bại');
+    }
 
-    setUser(mockUser);
-    localStorage.setItem('user', JSON.stringify(mockUser));
+    const userData: User = await response.json();
+    setUser(userData);
+    localStorage.setItem('user', JSON.stringify(userData));
+    localStorage.setItem('token', userData.token);
   };
 
-  const logout = () => {
-    setUser(null);
-    localStorage.removeItem('user');
+  const logout = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      await fetch(`${API_BASE_URL}/Auth/logout`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+      });
+    } catch (error) {
+      console.error(error);
+    } finally {
+      setUser(null);
+      localStorage.removeItem('user');
+      localStorage.removeItem('token');
+    }
   };
 
   return (

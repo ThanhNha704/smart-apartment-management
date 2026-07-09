@@ -9,7 +9,6 @@ export default function LoginPage() {
   const { login } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [role, setRole] = useState<'landlord' | 'tenant'>('landlord');
   const [isLoading, setIsLoading] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -17,16 +16,17 @@ export default function LoginPage() {
     setIsLoading(true);
 
     try {
-      await login(email, password, role);
+      const user = await login(email, password);
       toast.success('Đăng nhập thành công!');
 
-      if (role === 'landlord') {
+      // Kiểm tra quyền dựa trên roleLabel trả về từ Swagger API
+      if (user?.roleLabel === 'Landlord' || user?.role === 1) {
         navigate('/dashboard');
       } else {
         navigate('/tenant/dashboard');
       }
     } catch (error) {
-      toast.error('Đăng nhập thất bại. Vui lòng thử lại!');
+      toast.error('Đăng nhập thất bại. Vui lòng kiểm tra lại tài khoản, mật khẩu!');
     } finally {
       setIsLoading(false);
     }
@@ -44,31 +44,6 @@ export default function LoginPage() {
         </div>
 
         <div className="bg-white rounded-2xl shadow-xl p-8">
-          <div className="flex gap-2 mb-6 p-1 bg-gray-100 rounded-lg">
-            <button
-              type="button"
-              onClick={() => setRole('landlord')}
-              className={`flex-1 py-2 rounded-md text-sm font-medium transition-all ${
-                role === 'landlord'
-                  ? 'bg-white text-blue-600 shadow-sm'
-                  : 'text-gray-600 hover:text-gray-900'
-              }`}
-            >
-              Chủ nhà
-            </button>
-            <button
-              type="button"
-              onClick={() => setRole('tenant')}
-              className={`flex-1 py-2 rounded-md text-sm font-medium transition-all ${
-                role === 'tenant'
-                  ? 'bg-white text-blue-600 shadow-sm'
-                  : 'text-gray-600 hover:text-gray-900'
-              }`}
-            >
-              Người thuê
-            </button>
-          </div>
-
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">Email</label>
@@ -144,10 +119,6 @@ export default function LoginPage() {
               </button>
             </p>
           </div>
-        </div>
-
-        <div className="mt-8 text-center text-sm text-gray-500">
-          <p>Demo - Sử dụng bất kỳ email/mật khẩu để đăng nhập</p>
         </div>
       </div>
     </div>

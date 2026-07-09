@@ -3,12 +3,14 @@ import { Plus, Edit, Trash2, Building2, DoorOpen, Users } from 'lucide-react';
 import * as Dialog from '@radix-ui/react-dialog';
 import { toast } from 'sonner';
 
-const API_BASE_URL = 'http://localhost:5000/api'; 
+export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
 
 // Định nghĩa Interface
 interface FloorItem {
-  id: number;
-  floorNumber: string;
+  id: string; // Mongo ObjectId
+  floorNumber: number; // int
+  name: string;
+  description?: string;
   roomCount: number;
   occupiedRooms: number;
   emptyRooms: number;
@@ -66,10 +68,18 @@ export default function FloorManagement() {
   const handleAddFloor = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
+      const num = parseInt(addFormData.floorNumber.replace(/\D/g, '')) || 0;
+      const name = addFormData.floorNumber.includes('Tầng') ? addFormData.floorNumber : `Tầng ${addFormData.floorNumber}`;
+      const payload = {
+        floorNumber: num,
+        name: name,
+        description: ''
+      };
+      
       const response = await fetch(`${API_BASE_URL}/Floors`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(addFormData),
+        body: JSON.stringify(payload),
       });
 
       if (response.ok) {
@@ -78,7 +88,9 @@ export default function FloorManagement() {
         setAddFormData({ floorNumber: '', roomCount: 0 });
         fetchFloors();
       } else {
-        toast.error('Thêm tầng thất bại. Vui lòng thử lại!');
+        const errorData = await response.json().catch(() => null);
+        const errMsg = errorData?.join?.(', ') || 'Thêm tầng thất bại. Vui lòng thử lại!';
+        toast.error(errMsg);
       }
     } catch (error) {
       toast.error('Lỗi kết nối đến server!');
@@ -89,7 +101,7 @@ export default function FloorManagement() {
   const handleOpenEdit = (floor: FloorItem) => {
     setSelectedFloor(floor);
     setEditFormData({
-      floorNumber: floor.floorNumber,
+      floorNumber: floor.floorNumber.toString(),
       roomCount: floor.roomCount,
     });
     setIsEditDialogOpen(true);
@@ -101,10 +113,18 @@ export default function FloorManagement() {
     if (!selectedFloor) return;
 
     try {
+      const num = parseInt(editFormData.floorNumber.replace(/\D/g, '')) || 0;
+      const name = editFormData.floorNumber.includes('Tầng') ? editFormData.floorNumber : `Tầng ${editFormData.floorNumber}`;
+      const payload = {
+        floorNumber: num,
+        name: name,
+        description: selectedFloor.description || ''
+      };
+
       const response = await fetch(`${API_BASE_URL}/Floors/${selectedFloor.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(editFormData), // Gửi chuân request body { floorNumber, roomCount }
+        body: JSON.stringify(payload), // Gửi chuân request body
       });
 
       if (response.ok) {
@@ -113,7 +133,9 @@ export default function FloorManagement() {
         setSelectedFloor(null);
         fetchFloors();
       } else {
-        toast.error('Cập nhật thất bại!');
+        const errorData = await response.json().catch(() => null);
+        const errMsg = errorData?.join?.(', ') || 'Cập nhật thất bại!';
+        toast.error(errMsg);
       }
     } catch (error) {
       toast.error('Lỗi kết nối đến server!');
@@ -121,7 +143,7 @@ export default function FloorManagement() {
   };
 
   // Hàm DELETE: Xóa tầng
-  const handleDeleteFloor = async (id: number) => {
+  const handleDeleteFloor = async (id: string) => {
     if (!window.confirm('Bạn có chắc chắn muốn xóa tầng này không?')) return;
 
     try {
@@ -133,7 +155,8 @@ export default function FloorManagement() {
         toast.success('Xóa tầng thành công!');
         fetchFloors();
       } else {
-        toast.error('Xóa tầng thất bại!');
+        const errorMsg = await response.text();
+        toast.error(errorMsg || 'Xóa tầng thất bại!');
       }
     } catch (error) {
       toast.error('Lỗi kết nối đến server!');
@@ -191,7 +214,7 @@ export default function FloorManagement() {
                     <Building2 className="w-6 h-6 text-blue-600" />
                   </div>
                   <div>
-                    <h3 className="text-xl font-semibold">Tầng {floor.floorNumber}</h3>
+                    <h3 className="text-xl font-semibold">{floor.name || `Tầng ${floor.floorNumber}`}</h3>
                     <p className="text-sm text-gray-600">{floor.roomCount} phòng</p>
                   </div>
                 </div>
@@ -275,8 +298,7 @@ export default function FloorManagement() {
                   type="number"
                   value={addFormData.roomCount || ''}
                   disabled
-                  // onChange={(e) => setAddFormData({...addFormData, roomCount: Number(e.target.value)})}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50"
                   placeholder="0"
                   required
                 />
@@ -317,14 +339,13 @@ export default function FloorManagement() {
                   type="number"
                   value={editFormData.roomCount || ''}
                   disabled
-                  onChange={(e) => setEditFormData({...editFormData, roomCount: Number(e.target.value)})}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50"
                   required
                 />
               </div>
               <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
                 <p className="text-sm text-yellow-800">
-                  ⚠️ Lưu ý: Thay đổi số lượng phòng có thể ảnh hưởng đến dữ liệu hiện tại
+                  ⚠️ Lưu ý: Số lượng phòng được quản lý tự động theo số phòng thực tế của tầng
                 </p>
               </div>
               <div className="flex gap-2 pt-4">

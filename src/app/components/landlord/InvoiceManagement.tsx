@@ -5,7 +5,7 @@ import { toast } from 'sonner';
 import axios from 'axios';
 
 // Cấu hình Base URL của Backend API (bạn sửa lại port/domain cho đúng với môi trường của bạn)
-const API_BASE_URL = 'http://localhost:5000/api/Invoices';
+export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
 
 interface Invoice {
   id: string;
@@ -27,7 +27,7 @@ interface Invoice {
 
 export default function InvoiceManagement() {
   const [invoices, setInvoices] = useState<Invoice[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [isLoading, setIsisLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState<string>('all');
   const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
@@ -48,15 +48,17 @@ export default function InvoiceManagement() {
 
   // 1. Hàm GET lấy dữ liệu thật từ Backend
   const fetchInvoices = async () => {
-    setLoading(true);
     try {
-      const response = await axios.get<Invoice[]>(API_BASE_URL);
-      setInvoices(response.data);
-    } catch (error) {
-      console.error(error);
-      toast.error('Không thể tải danh sách hóa đơn từ hệ thống!');
-    } finally {
-      setLoading(false);
+      setIsisLoading(true);
+            const response = await fetch(`${API_BASE_URL}/Invoices`);
+            if (!response.ok) throw new Error('Không thể tải dữ liệu');
+            const data: Invoice[] = await response.json();
+            setInvoices(data);
+          } catch (error) {
+            toast.error('Lỗi khi lấy danh sách hóa đơn từ server!');
+            console.error(error);
+          } finally {
+            setIsisLoading(false);
     }
   };
 
@@ -192,7 +194,7 @@ export default function InvoiceManagement() {
       {/* Bảng Hiển Thị */}
       <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
         <div className="overflow-x-auto">
-          {loading ? (
+          {isLoading ? (
             <div className="p-10 text-center text-gray-500">Đang tải dữ liệu thực...</div>
           ) : (
             <table className="w-full">

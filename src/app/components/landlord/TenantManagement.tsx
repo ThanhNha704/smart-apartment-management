@@ -1,11 +1,11 @@
 import { useState, useEffect } from 'react';
-import { Search, Plus, Edit, Trash2, Phone, Mail, MapPin, Loader2, UserCheck } from 'lucide-react';
+import { Search, Plus, Edit, Trash2, Phone, Mail, MapPin, Loader2 } from 'lucide-react';
 import * as Dialog from '@radix-ui/react-dialog';
 import { toast } from 'sonner';
 import axios from 'axios';
 
 // Cấu hình URL của Backend API
-const API_BASE_URL = 'http://localhost:5000/api'; 
+export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
 
 // Interface khớp 100% với Schema mẫu từ GET/POST /api/Users trong Swagger của bạn
 interface UserTenant {

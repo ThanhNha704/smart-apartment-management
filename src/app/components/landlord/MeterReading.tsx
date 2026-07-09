@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react';
 import { Camera, Upload, Calendar, CheckCircle } from 'lucide-react';
 import { toast } from 'sonner';
 
+export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
+
 interface Room {
   id: string;
   roomNumber: string;
@@ -26,7 +28,8 @@ interface MeterReadingItem {
 export default function MeterReading() {
   const [rooms, setRooms] = useState<Room[]>([]);
   const [readings, setReadings] = useState<MeterReadingItem[]>([]);
-  
+  const [isLoading, setIsisLoading] = useState(false);
+
   const [selectedRoomNumber, setSelectedRoomNumber] = useState('');
   const [currentIndex, setCurrentIndex] = useState('');
   const [meterType, setMeterType] = useState<'1' | '2'>('1'); // Giả định: 1 = Điện, 2 = Nước
@@ -42,13 +45,16 @@ export default function MeterReading() {
 
   const fetchRooms = async () => {
     try {
-      const res = await fetch('/api/Rooms');
-      if (res.ok) {
-        const data = await res.json();
-        setRooms(data);
-      }
+      setIsisLoading(true);
+      const response = await fetch(`${API_BASE_URL}/Invoices`);
+      if (!response.ok) throw new Error('Không thể tải dữ liệu');
+      const data: Room[] = await response.json();
+      setRooms(data);
     } catch (error) {
-      console.error('Lỗi tải danh sách phòng:', error);
+      toast.error('Lỗi khi lấy danh sách hóa đơn từ server!');
+      console.error(error);
+    } finally {
+      setIsisLoading(false);
     }
   };
 
@@ -164,22 +170,22 @@ export default function MeterReading() {
                 <label className="block text-sm font-medium mb-2 text-gray-700">Loại công tơ</label>
                 <div className="flex gap-4">
                   <label className="flex items-center gap-2 text-sm cursor-pointer">
-                    <input 
-                      type="radio" 
-                      name="meterType" 
-                      checked={meterType === '1'} 
+                    <input
+                      type="radio"
+                      name="meterType"
+                      checked={meterType === '1'}
                       onChange={() => setMeterType('1')}
-                      className="text-blue-600 focus:ring-blue-500" 
+                      className="text-blue-600 focus:ring-blue-500"
                     />
                     Công tơ Điện
                   </label>
                   <label className="flex items-center gap-2 text-sm cursor-pointer">
-                    <input 
-                      type="radio" 
-                      name="meterType" 
-                      checked={meterType === '2'} 
+                    <input
+                      type="radio"
+                      name="meterType"
+                      checked={meterType === '2'}
                       onChange={() => setMeterType('2')}
-                      className="text-blue-600 focus:ring-blue-500" 
+                      className="text-blue-600 focus:ring-blue-500"
                     />
                     Công tơ Nước
                   </label>

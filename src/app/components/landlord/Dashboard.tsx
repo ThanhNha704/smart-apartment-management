@@ -3,7 +3,7 @@ import { Building2, Users, DollarSign, AlertCircle } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import { toast } from 'sonner';
 
-const API_BASE_URL = 'http://localhost:5000/api';
+export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
 
 // Định nghĩa Interface
 interface RevenueMonth {
@@ -13,7 +13,7 @@ interface RevenueMonth {
 
 interface RecentActivity {
   type: string;
-  username: string;
+  userName: string; // Khớp với userName (camelCase của UserName từ backend)
   description: string;
   roomNumber: string;
   timeAgo: string;
@@ -177,7 +177,7 @@ export default function Dashboard() {
                       }`}>
                         {activity.type || 'Hệ thống'}
                       </span>
-                      <span className="font-medium">{activity.username}</span>
+                      <span className="font-medium">{activity.userName}</span>
                       {activity.roomNumber && (
                         <>
                           <span className="text-gray-400">•</span>

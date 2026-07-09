@@ -5,7 +5,7 @@ import { toast } from 'sonner';
 import axios from 'axios';
 
 // Cấu hình Endpoint thật từ hệ thống của bạn
-const API_BASE_URL = 'http://localhost:5000/api/MaintenanceRequests';
+export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
 
 interface MaintenanceItem {
   id: string;
