@@ -14,7 +14,7 @@ interface MeterReadingItem {
   id: string;
   roomNumber: string;
   tenantName: string;
-  typeLabel: string;
+  typeLabel: string; // 0: điện, 1: nước
   month: number;
   year: number;
   previousIndex: number;
@@ -28,11 +28,11 @@ interface MeterReadingItem {
 export default function MeterReading() {
   const [rooms, setRooms] = useState<Room[]>([]);
   const [readings, setReadings] = useState<MeterReadingItem[]>([]);
-  const [isLoading, setIsisLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
 
   const [selectedRoomNumber, setSelectedRoomNumber] = useState('');
   const [currentIndex, setCurrentIndex] = useState('');
-  const [meterType, setMeterType] = useState<'1' | '2'>('1'); // Giả định: 1 = Điện, 2 = Nước
+  const [meterType, setMeterType] = useState<'0' | '1'>('0'); // Giả định: 0 = Điện, 1 = Nước
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isScanning, setIsScanning] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -45,27 +45,28 @@ export default function MeterReading() {
 
   const fetchRooms = async () => {
     try {
-      setIsisLoading(true);
-      const response = await fetch(`${API_BASE_URL}/Invoices`);
+      setIsLoading(true);
+      const response = await fetch(`${API_BASE_URL}/Rooms`);
       if (!response.ok) throw new Error('Không thể tải dữ liệu');
       const data: Room[] = await response.json();
       setRooms(data);
     } catch (error) {
-      toast.error('Lỗi khi lấy danh sách hóa đơn từ server!');
+      toast.error('Lỗi khi lấy danh sách phòng từ server!');
       console.error(error);
     } finally {
-      setIsisLoading(false);
+      setIsLoading(false);
     }
   };
 
   const fetchReadings = async () => {
     try {
-      const res = await fetch('/api/MeterReadings');
-      if (res.ok) {
-        const data = await res.json();
-        setReadings(data);
-      }
+      setIsLoading(true);
+      const response = await fetch(`${API_BASE_URL}/MeterReadings`);
+      if (!response.ok) throw new Error('Không thể tải dữ liệu');
+      const data: MeterReadingItem[] = await response.json();
+      setReadings(data);
     } catch (error) {
+      toast.error('Lỗi khi tải lịch sử ghi số từ server!');
       console.error('Lỗi tải lịch sử ghi số:', error);
     }
   };
@@ -173,8 +174,8 @@ export default function MeterReading() {
                     <input
                       type="radio"
                       name="meterType"
-                      checked={meterType === '1'}
-                      onChange={() => setMeterType('1')}
+                      checked={meterType === '0'}
+                      onChange={() => setMeterType('0')}
                       className="text-blue-600 focus:ring-blue-500"
                     />
                     Công tơ Điện
@@ -183,8 +184,8 @@ export default function MeterReading() {
                     <input
                       type="radio"
                       name="meterType"
-                      checked={meterType === '2'}
-                      onChange={() => setMeterType('2')}
+                      checked={meterType === '1'}
+                      onChange={() => setMeterType('1')}
                       className="text-blue-600 focus:ring-blue-500"
                     />
                     Công tơ Nước

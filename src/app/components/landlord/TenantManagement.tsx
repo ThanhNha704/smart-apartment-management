@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Search, Plus, Edit, Trash2, Phone, Mail, MapPin, Loader2 } from 'lucide-react';
+import { Search, Plus, Edit, Trash2, Phone, Mail, MapPin, Loader2, Eye, EyeOff } from 'lucide-react';
 import * as Dialog from '@radix-ui/react-dialog';
 import { toast } from 'sonner';
 import axios from 'axios';
@@ -13,7 +13,7 @@ interface UserTenant {
   createdAt?: string;
   updatedAt?: string;
   name: string;
-  username: string;
+  // username: string;
   password?: string;
   phoneNumber: string;
   email: string;
@@ -26,7 +26,7 @@ interface UserTenant {
 // Khởi tạo form trống tương ứng với Request Body của POST /api/Users
 const blankTenantFormData = {
   name: '',
-  username: '',
+  // username: '',
   password: '',
   phoneNumber: '',
   email: '',
@@ -37,11 +37,15 @@ export default function TenantManagement() {
   const [tenants, setTenants] = useState<UserTenant[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [searchTerm, setSearchTerm] = useState('');
-  
+  const [showPassword, setShowPassword] = useState(false);
+
+
   // Trạng thái đóng/mở Dialogs
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
-  
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [tenantToDelete, setTenantToDelete] = useState<string | null>(null);
+
   // States quản lý dữ liệu form
   const [formData, setFormData] = useState(blankTenantFormData);
   const [selectedTenantId, setSelectedTenantId] = useState<string | null>(null);
@@ -69,8 +73,11 @@ export default function TenantManagement() {
   // 2. Xử lý Thêm người thuê mới (POST /api/Users)
   const handleAddTenant = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    if (!formData.name || !formData.username || !formData.password || !formData.phoneNumber) {
+
+    if (!formData.name
+      // || !formData.username 
+      || !formData.password
+      || !formData.phoneNumber) {
       toast.error('Vui lòng điền đầy đủ các thông tin bắt buộc!');
       return;
     }
@@ -93,7 +100,7 @@ export default function TenantManagement() {
     setSelectedTenantId(tenant.id);
     setFormData({
       name: tenant.name,
-      username: tenant.username,
+      // username: tenant.username,
       password: '', // Không hiển thị lại mật khẩu cũ vì lý do bảo mật
       phoneNumber: tenant.phoneNumber,
       email: tenant.email,
@@ -124,31 +131,38 @@ export default function TenantManagement() {
   };
 
   // 4. Xử lý Xóa tài khoản người thuê (DELETE /api/Users/{id})
-  const handleDeleteTenant = async (id: string) => {
-    if (window.confirm('Bạn có chắc chắn muốn xóa tài khoản người thuê này khỏi cơ sở dữ liệu?')) {
-      try {
-        await axios.delete(`${API_BASE_URL}/Users/${id}`);
-        toast.success('Đã xóa tài khoản thành công!');
-        fetchTenants();
-      } catch (error) {
-        console.error(error);
-        toast.error('Không thể xóa người dùng này (Có thể liên quan đến ràng buộc dữ liệu hợp đồng).');
-      }
+  const confirmDeleteTenant = async () => {
+    if (!tenantToDelete) return;
+    try {
+      await axios.delete(`${API_BASE_URL}/Users/${tenantToDelete}`);
+      toast.success('Đã xóa tài khoản thành công!');
+      setIsDeleteDialogOpen(false);
+      setTenantToDelete(null);
+      fetchTenants(); // Hoặc fetchData() tùy theo hàm làm mới dữ liệu của bạn
+    } catch (error) {
+      console.error(error);
+      toast.error('Không thể xóa người dùng này (Có thể liên quan đến ràng buộc dữ liệu hợp đồng).');
     }
+  };
+
+  // Hàm này gắn vào sự kiện onClick của nút "Xóa" dưới danh sách/bảng
+  const openDeleteModal = (id: string) => {
+    setTenantToDelete(id);
+    setIsDeleteDialogOpen(true);
   };
 
   // Tìm kiếm cục bộ trên tập dữ liệu dynamic lấy về từ backend
   const filteredTenants = tenants.filter(tenant =>
     tenant.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    tenant.phoneNumber?.includes(searchTerm) ||
-    tenant.username?.toLowerCase().includes(searchTerm.toLowerCase())
+    tenant.phoneNumber?.includes(searchTerm)
+    // || tenant.username?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   return (
     <div className="p-6 max-w-7xl mx-auto">
       <div className="mb-6">
         <h1 className="text-2xl font-semibold mb-1">Quản lý người thuê</h1>
-        <p className="text-gray-600">Dữ liệu đồng bộ trực tiếp với danh sách tài khoản hệ thống</p>
+        <p className="text-gray-600">Dữ liệu danh sách tài khoản hệ thống</p>
       </div>
 
       {/* Tìm kiếm & Thêm mới */}
@@ -164,8 +178,8 @@ export default function TenantManagement() {
               className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
           </div>
-          
-          <button 
+
+          <button
             onClick={() => {
               setFormData(blankTenantFormData);
               setIsAddOpen(true);
@@ -194,9 +208,9 @@ export default function TenantManagement() {
                   </div>
                   <div>
                     <h3 className="font-semibold text-lg">{tenant.name}</h3>
-                    <div className="text-xs text-gray-500">
+                    {/* <div className="text-xs text-gray-500">
                       Tài khoản: <span className="font-mono font-medium text-gray-700">{tenant.username}</span>
-                    </div>
+                    </div> */}
                   </div>
                 </div>
                 <span className={`px-2 py-1 rounded-full text-xs font-medium ${tenant.isActive !== false ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
@@ -226,8 +240,8 @@ export default function TenantManagement() {
                 >
                   <Edit className="w-4 h-4" /> Sửa thông tin
                 </button>
-                <button 
-                  onClick={() => handleDeleteTenant(tenant.id)}
+                <button
+                  onClick={() => openDeleteModal(tenant.id)}
                   className="px-3 py-2 border border-red-200 text-red-600 rounded-lg hover:bg-red-50"
                 >
                   <Trash2 className="w-4 h-4" />
@@ -266,7 +280,7 @@ export default function TenantManagement() {
                     placeholder="090xxxxxxx"
                   />
                 </div>
-                <div>
+                {/* <div>
                   <label className="block text-sm font-medium mb-1">Tên tài khoản (username) <span className="text-red-500">*</span></label>
                   <input
                     type="text" required
@@ -275,16 +289,30 @@ export default function TenantManagement() {
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg font-mono"
                     placeholder="anv123"
                   />
-                </div>
+                </div> */}
                 <div>
                   <label className="block text-sm font-medium mb-1">Mật khẩu kích hoạt <span className="text-red-500">*</span></label>
-                  <input
-                    type="password" required
-                    value={formData.password}
-                    onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg"
-                    placeholder="••••••••"
-                  />
+                  <div className="relative">
+                    <input
+                      type={showPassword ? "text" : "password"}
+                      value={formData.password}
+                      onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                      placeholder="••••••••"
+                      required
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 focus:outline-none"
+                    >
+                      {showPassword ? (
+                        <EyeOff className="w-5 h-5" />
+                      ) : (
+                        <Eye className="w-5 h-5" />
+                      )}
+                    </button>
+                  </div>
                 </div>
               </div>
 
@@ -345,16 +373,17 @@ export default function TenantManagement() {
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg"
                   />
                 </div>
-                <div>
+                {/* <div>
                   <label className="block text-sm font-medium mb-1">Tên tài khoản (Không được đổi)</label>
                   <input
                     type="text" disabled
                     value={formData.username}
                     className="w-full px-3 py-2 border border-gray-300 bg-gray-50 rounded-lg text-gray-500 font-mono"
                   />
-                </div>
+                </div> */}
                 <div>
-                  <label className="block text-sm font-medium mb-1">Mật khẩu mới (Bỏ trống nếu giữ nguyên)</label>
+                  <label className="block text-sm font-medium mb-1">Mật khẩu mới</label>
+                  <label className="block text-sm text-gray-500 font-medium mb-1">(Bỏ trống nếu giữ nguyên)</label>
                   <input
                     type="password"
                     value={formData.password}
@@ -390,6 +419,34 @@ export default function TenantManagement() {
                 <button type="submit" className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">Lưu thay đổi</button>
               </div>
             </form>
+          </Dialog.Content>
+        </Dialog.Portal>
+      </Dialog.Root>
+
+      {/* Dialog Xác nhận xóa tài khoản */}
+      <Dialog.Root open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+        <Dialog.Portal>
+          <Dialog.Overlay className="fixed inset-0 bg-black/50 animate-fade-in" />
+          <Dialog.Content className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-white rounded-lg p-6 w-full max-w-sm shadow-xl border border-gray-200">
+            <Dialog.Title className="text-lg font-semibold text-gray-900 mb-2">
+              Xác nhận xóa tài khoản
+            </Dialog.Title>
+
+            <p className="text-sm text-gray-500 mb-5">
+              Bạn có chắc chắn muốn xóa tài khoản người thuê này khỏi cơ sở dữ liệu? Hành động này không thể hoàn tác.
+            </p>
+
+            <div className="flex gap-2">
+              <Dialog.Close className="flex-1 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 text-sm font-medium transition-colors">
+                Hủy
+              </Dialog.Close>
+              <button
+                onClick={confirmDeleteTenant}
+                className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 text-sm font-medium transition-colors"
+              >
+                Xác nhận xóa
+              </button>
+            </div>
           </Dialog.Content>
         </Dialog.Portal>
       </Dialog.Root>

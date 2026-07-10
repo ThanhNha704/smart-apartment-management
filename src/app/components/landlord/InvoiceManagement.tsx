@@ -13,16 +13,17 @@ interface Invoice {
   roomNumber: string;
   tenantName: string;
   billingPeriod: string;
+  dueDate: string;
+  status: number; // 0 = Chờ thanh toán, 1 = Đã thanh toán, 2 = Quá hạn
+  statusLabel: string;
   roomPrice: number;
-  electricityUsage: number;
-  electricityPrice: number;
+  electricUsage: number;
+  electricPrice: number;
+  electricTotal: number;
   waterUsage: number;
   waterPrice: number;
   serviceFee: number;
   amount: number;
-  status: number; // 0 = Chờ thanh toán, 1 = Đã thanh toán, 2 = Quá hạn
-  statusLabel: string;
-  dueDate: string;
 }
 
 export default function InvoiceManagement() {
@@ -38,9 +39,9 @@ export default function InvoiceManagement() {
     roomNumber: '',
     tenantName: '',
     billingPeriod: '',
-    electricityUsage: 0,
+    electricUsage: 0,
     waterUsage: 0,
-    electricityPrice: 3000,
+    electricPrice: 3000,
     waterPrice: 10000,
     serviceFee: 200000,
     roomPrice: 2500000,
@@ -69,9 +70,9 @@ export default function InvoiceManagement() {
   // 2. Hàm POST gửi dữ liệu thật lên Backend để tạo hóa đơn
   const handleCreateInvoice = async (e: React.FormEvent) => {
     e.preventDefault();
-    const electricityAmount = createFormData.electricityUsage * createFormData.electricityPrice;
+    const electricAmount = createFormData.electricUsage * createFormData.electricPrice;
     const waterAmount = createFormData.waterUsage * createFormData.waterPrice;
-    const totalAmount = createFormData.roomPrice + electricityAmount + waterAmount + createFormData.serviceFee;
+    const totalAmount = createFormData.roomPrice + electricAmount + waterAmount + createFormData.serviceFee;
 
     // Payload chuẩn chỉnh theo Swagger của bạn
     const payload = {
@@ -79,8 +80,8 @@ export default function InvoiceManagement() {
       tenantName: createFormData.tenantName,
       billingPeriod: createFormData.billingPeriod,
       roomPrice: createFormData.roomPrice,
-      electricityUsage: createFormData.electricityUsage,
-      electricityPrice: createFormData.electricityPrice,
+      electricUsage: createFormData.electricUsage,
+      electricPrice: createFormData.electricPrice,
       waterUsage: createFormData.waterUsage,
       waterPrice: createFormData.waterPrice,
       serviceFee: createFormData.serviceFee,
@@ -98,9 +99,9 @@ export default function InvoiceManagement() {
         roomNumber: '',
         tenantName: '',
         billingPeriod: '',
-        electricityUsage: 0,
+        electricUsage: 0,
         waterUsage: 0,
-        electricityPrice: 3000,
+        electricPrice: 3000,
         waterPrice: 10000,
         serviceFee: 200000,
         roomPrice: 2500000,
@@ -237,9 +238,9 @@ export default function InvoiceManagement() {
                           <button onClick={() => { setSelectedInvoice(invoice); setShowQRDialog(true); }} className="p-2 hover:bg-gray-100 rounded-lg" title="QR Code">
                             <QrCode className="w-4 h-4" />
                           </button>
-                          <button className="p-2 hover:bg-gray-100 rounded-lg" title="Tải xuống">
+                          {/* <button className="p-2 hover:bg-gray-100 rounded-lg" title="Tải xuống">
                             <Download className="w-4 h-4" />
-                          </button>
+                          </button> */}
                         </div>
                       </td>
                     </tr>
@@ -287,8 +288,8 @@ export default function InvoiceManagement() {
                         <span className="font-medium">{(selectedInvoice.roomPrice || 0).toLocaleString('vi-VN')} ₫</span>
                       </div>
                       <div className="flex justify-between">
-                        <span>Điện ({selectedInvoice.electricityUsage} kWh × {selectedInvoice.electricityPrice} ₫)</span>
-                        <span className="font-medium">{(selectedInvoice.electricityUsage * selectedInvoice.electricityPrice).toLocaleString('vi-VN')} ₫</span>
+                        <span>Điện ({selectedInvoice.electricUsage} kWh × {selectedInvoice.electricPrice} ₫)</span>
+                        <span className="font-medium">{(selectedInvoice.electricUsage * selectedInvoice.electricPrice).toLocaleString('vi-VN')} ₫</span>
                       </div>
                       <div className="flex justify-between">
                         <span>Nước ({selectedInvoice.waterUsage} m³ × {selectedInvoice.waterPrice} ₫)</span>
@@ -414,8 +415,8 @@ export default function InvoiceManagement() {
                   <label className="block text-sm font-medium mb-1">Sản lượng điện tiêu thụ (kWh)</label>
                   <input
                     type="number"
-                    value={createFormData.electricityUsage}
-                    onChange={(e) => setCreateFormData({...createFormData, electricityUsage: Number(e.target.value)})}
+                    value={createFormData.electricUsage}
+                    onChange={(e) => setCreateFormData({...createFormData, electricUsage: Number(e.target.value)})}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg"
                     required
                   />
@@ -424,8 +425,8 @@ export default function InvoiceManagement() {
                   <label className="block text-sm font-medium mb-1">Đơn giá điện (Đồng/kWh)</label>
                   <input
                     type="number"
-                    value={createFormData.electricityPrice}
-                    onChange={(e) => setCreateFormData({...createFormData, electricityPrice: Number(e.target.value)})}
+                    value={createFormData.electricPrice}
+                    onChange={(e) => setCreateFormData({...createFormData, electricPrice: Number(e.target.value)})}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg"
                     required
                   />
@@ -473,7 +474,7 @@ export default function InvoiceManagement() {
                     <span>Tổng tiền hóa đơn dự kiến:</span>
                     <span className="font-bold text-blue-600 text-base">
                       {(createFormData.roomPrice +
-                        createFormData.electricityUsage * createFormData.electricityPrice +
+                        createFormData.electricUsage * createFormData.electricPrice +
                         createFormData.waterUsage * createFormData.waterPrice +
                         createFormData.serviceFee).toLocaleString('vi-VN')} ₫
                     </span>

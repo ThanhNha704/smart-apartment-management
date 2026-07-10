@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Plus, Edit, Trash2, Building2, DoorOpen, Users } from 'lucide-react';
 import * as Dialog from '@radix-ui/react-dialog';
 import { toast } from 'sonner';
+import axios from 'axios';
 
 export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
 
@@ -33,6 +34,8 @@ export default function FloorManagement() {
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [selectedFloor, setSelectedFloor] = useState<FloorItem | null>(null);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [floorToDelete, setFloorToDelete] = useState<string | null>(null);
 
   // States quản lý dữ liệu Form nhập vào
   const [addFormData, setAddFormData] = useState({ floorNumber: '', roomCount: 0 });
@@ -75,7 +78,7 @@ export default function FloorManagement() {
         name: name,
         description: ''
       };
-      
+
       const response = await fetch(`${API_BASE_URL}/Floors`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -143,26 +146,25 @@ export default function FloorManagement() {
   };
 
   // Hàm DELETE: Xóa tầng
-  const handleDeleteFloor = async (id: string) => {
-    if (!window.confirm('Bạn có chắc chắn muốn xóa tầng này không?')) return;
-
+  const confirmDeleteFloor = async () => {
+    if (!floorToDelete) return;
     try {
-      const response = await fetch(`${API_BASE_URL}/Floors/${id}`, {
-        method: 'DELETE',
-      });
-
-      if (response.ok) {
-        toast.success('Xóa tầng thành công!');
-        fetchFloors();
-      } else {
-        const errorMsg = await response.text();
-        toast.error(errorMsg || 'Xóa tầng thất bại!');
-      }
+      await axios.delete(`${API_BASE_URL}/Floors/${floorToDelete}`);
+      toast.success('Đã xóa tầng thành công!');
+      setIsDeleteDialogOpen(false);
+      setFloorToDelete(null);
+      fetchFloors(); // Hoặc fetchData() tùy theo hàm làm mới dữ liệu của bạn
     } catch (error) {
-      toast.error('Lỗi kết nối đến server!');
+      console.error(error);
+      toast.error('Không thể xóa tầng này (Có thể liên quan đến ràng buộc dữ liệu hợp đồng).');
     }
   };
 
+  // Hàm này gắn vào sự kiện onClick của nút "Xóa" dưới danh sách/bảng
+  const openDeleteModal = (id: string) => {
+    setFloorToDelete(id);
+    setIsDeleteDialogOpen(true);
+  };
   if (isLoading) {
     return <div className="p-6 text-center text-gray-500">Đang tải dữ liệu từ server...</div>;
   }
@@ -214,7 +216,7 @@ export default function FloorManagement() {
                     <Building2 className="w-6 h-6 text-blue-600" />
                   </div>
                   <div>
-                    <h3 className="text-xl font-semibold">{floor.name || `Tầng ${floor.floorNumber}`}</h3>
+                    <h3 className="text-xl font-semibold">{`Tầng ${floor.floorNumber}`}</h3>
                     <p className="text-sm text-gray-600">{floor.roomCount} phòng</p>
                   </div>
                 </div>
@@ -225,8 +227,8 @@ export default function FloorManagement() {
                   >
                     <Edit className="w-4 h-4" />
                   </button>
-                  <button 
-                    onClick={() => handleDeleteFloor(floor.id)}
+                  <button
+                    onClick={() => openDeleteModal(floor.id)}
                     className="p-2 hover:bg-red-50 text-red-600 rounded-lg"
                   >
                     <Trash2 className="w-4 h-4" />
@@ -286,7 +288,7 @@ export default function FloorManagement() {
                 <input
                   type="text"
                   value={addFormData.floorNumber}
-                  onChange={(e) => setAddFormData({...addFormData, floorNumber: e.target.value})}
+                  onChange={(e) => setAddFormData({ ...addFormData, floorNumber: e.target.value })}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                   placeholder="Ví dụ: Tầng 5 hoặc 5"
                   required
@@ -328,7 +330,7 @@ export default function FloorManagement() {
                 <input
                   type="text"
                   value={editFormData.floorNumber}
-                  onChange={(e) => setEditFormData({...editFormData, floorNumber: e.target.value})}
+                  onChange={(e) => setEditFormData({ ...editFormData, floorNumber: e.target.value })}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                   required
                 />
@@ -357,6 +359,34 @@ export default function FloorManagement() {
                 </button>
               </div>
             </form>
+          </Dialog.Content>
+        </Dialog.Portal>
+      </Dialog.Root>
+
+      {/* Dialog Xác nhận xóa tài khoản */}
+      <Dialog.Root open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+        <Dialog.Portal>
+          <Dialog.Overlay className="fixed inset-0 bg-black/50 animate-fade-in" />
+          <Dialog.Content className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-white rounded-lg p-6 w-full max-w-sm shadow-xl border border-gray-200">
+            <Dialog.Title className="text-lg font-semibold text-gray-900 mb-2">
+              Xác nhận xóa tầng
+            </Dialog.Title>
+
+            <p className="text-sm text-gray-500 mb-5">
+              Bạn có chắc chắn muốn xóa tầng này khỏi cơ sở dữ liệu? Hành động này không thể hoàn tác.
+            </p>
+
+            <div className="flex gap-2">
+              <Dialog.Close className="flex-1 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 text-sm font-medium transition-colors">
+                Hủy
+              </Dialog.Close>
+              <button
+                onClick={confirmDeleteFloor}
+                className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 text-sm font-medium transition-colors"
+              >
+                Xác nhận xóa
+              </button>
+            </div>
           </Dialog.Content>
         </Dialog.Portal>
       </Dialog.Root>

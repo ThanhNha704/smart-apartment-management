@@ -31,22 +31,46 @@ interface ApiResponse {
 
 export default function MaintenanceRequests() {
   const [apiData, setApiData] = useState<ApiResponse | null>(null);
-  const [loading, setLoading] = useState(false);
+  const [loading, setIsLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState<string>('all');
   const [selectedRequest, setSelectedRequest] = useState<MaintenanceItem | null>(null);
 
+  // Hàm Helper lấy token nhanh để gán vào request bảo mật
+  const getAuthHeaders = () => {
+    const token = localStorage.getItem('token');
+    return {
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+      },
+    };
+  };
+
   // 1. Lấy dữ liệu thời gian thực từ API Dashboard / Maintenance
   const fetchRequests = async () => {
-    setLoading(true);
     try {
-      const response = await axios.get<ApiResponse>(API_BASE_URL);
-      setApiData(response.data);
+      setIsLoading(true);
+      const token = localStorage.getItem('token');
+
+      const response = await fetch(`${API_BASE_URL}/MaintenanceRequests`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+        },
+      });
+
+      if (!response.ok) throw new Error('Không thể tải dữ liệu');
+
+      // SỬA TẠI ĐÂY: API trả về Object ApiResponse (chứa total, pending, items...) chứ không phải mảng trực tiếp
+      const data: ApiResponse = await response.json();
+      setApiData(data);
     } catch (error) {
-      console.error(error);
-      toast.error('Không thể kết nối đến máy chủ lấy dữ liệu sửa chữa!');
+      toast.error('Lỗi khi tải lịch sử sửa chữa từ server!');
+      console.error('Lỗi tải lịch sử sửa chữa:', error);
     } finally {
-      setLoading(false);
+      setIsLoading(false);
     }
   };
 
@@ -54,39 +78,39 @@ export default function MaintenanceRequests() {
     fetchRequests();
   }, []);
 
-  // 2. Gọi API PUT /{id}/start để bắt đầu xử lý
+  // 2. SỬA ĐƯỜNG DẪN: Gọi API PUT /MaintenanceRequests/{id}/start để bắt đầu xử lý
   const handleStartProcess = async (id: string) => {
     try {
-      await axios.put(`${API_BASE_URL}/${id}/start`);
+      await axios.put(`${API_BASE_URL}/MaintenanceRequests/${id}/start`, {}, getAuthHeaders());
       toast.success('Đã chuyển trạng thái sang Đang xử lý!');
       setSelectedRequest(null);
-      fetchRequests(); // Cập nhật lại dữ liệu giao diện
+      fetchRequests(); // Cập nhật lại giao diện dữ liệu mới
     } catch (error) {
       console.error(error);
       toast.error('Lỗi khi cập nhật trạng thái xử lý!');
     }
   };
 
-  // 3. Gọi API PUT /{id}/complete để hoàn thành xử lý
+  // 3. SỬA ĐƯỜNG DẪN: Gọi API PUT /MaintenanceRequests/{id}/complete để hoàn thành xử lý
   const handleCompleteProcess = async (id: string) => {
     try {
-      await axios.put(`${API_BASE_URL}/${id}/complete`);
+      await axios.put(`${API_BASE_URL}/MaintenanceRequests/${id}/complete`, {}, getAuthHeaders());
       toast.success('Đã hoàn thành xử lý yêu cầu!');
       setSelectedRequest(null);
-      fetchRequests(); // Cập nhật lại dữ liệu giao diện
+      fetchRequests(); // Cập nhật lại giao diện dữ liệu mới
     } catch (error) {
       console.error(error);
       toast.error('Lỗi khi hoàn thành yêu cầu sửa chữa!');
     }
   };
 
-  // Lọc dữ liệu client-side từ danh sách `items` trả về của API
+  // Lọc dữ liệu chuẩn xác từ mảng items bên trong apiData
   const items = apiData?.items || [];
   const filteredRequests = items.filter(request => {
     const matchesSearch = (request.requestNumber || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-                          (request.tenantName || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-                          (request.roomNumber || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-                          (request.title || '').toLowerCase().includes(searchTerm.toLowerCase());
+      (request.tenantName || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (request.roomNumber || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (request.title || '').toLowerCase().includes(searchTerm.toLowerCase());
     const matchesFilter = filterStatus === 'all' || String(request.status) === filterStatus;
     return matchesSearch && matchesFilter;
   });
@@ -129,7 +153,7 @@ export default function MaintenanceRequests() {
         <p className="text-gray-600">Xử lý các yêu cầu sửa chữa cơ sở vật chất thời gian thực</p>
       </div>
 
-      {/* Thống kê động từ API Counter */}
+      {/* Khối thống kê Counter tự động đồng bộ từ API */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
         <div className="bg-white p-4 rounded-lg border border-gray-200">
           <p className="text-gray-600 text-sm mb-1">Tổng yêu cầu</p>
@@ -175,12 +199,14 @@ export default function MaintenanceRequests() {
         </div>
       </div>
 
-      {/* Danh sách thẻ hiển thị dữ liệu */}
+      {/* Danh sách yêu cầu hiển thị dạng thẻ */}
       <div className="space-y-4">
         {loading ? (
           <div className="p-10 text-center text-gray-500">Đang đồng bộ dữ liệu sửa chữa...</div>
         ) : filteredRequests.length === 0 ? (
-          <div className="p-10 text-center text-gray-500 bg-white rounded-lg border border-gray-200">Không có yêu cầu nào trùng khớp.</div>
+          <div className="p-10 text-center text-gray-500 bg-white rounded-lg border border-gray-200">
+            Không có yêu cầu nào trùng khớp.
+          </div>
         ) : (
           filteredRequests.map((request) => (
             <div key={request.id} className="bg-white rounded-lg border border-gray-200 p-5 hover:shadow-lg transition-shadow">
@@ -241,7 +267,7 @@ export default function MaintenanceRequests() {
       <Dialog.Root open={selectedRequest !== null} onOpenChange={(open) => !open && setSelectedRequest(null)}>
         <Dialog.Portal>
           <Dialog.Overlay className="fixed inset-0 bg-black/50" />
-          <Dialog.Content className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-white rounded-lg p-6 w-full max-w-2xl max-h-[90vh] overflow-auto">
+          <Dialog.Content className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-white rounded-lg p-6 w-full max-w-2xl max-h-[90vh] overflow-auto z-50">
             {selectedRequest && (
               <>
                 <Dialog.Title className="text-xl font-semibold mb-4">Chi tiết yêu cầu hệ thống</Dialog.Title>

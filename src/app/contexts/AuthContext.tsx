@@ -1,4 +1,6 @@
-import { createContext, useContext, useState, type ReactNode } from 'react';
+import { createContext, useContext, useState, useEffect, type ReactNode } from 'react';
+
+export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
 
 interface User {
   id: string;
@@ -24,30 +26,41 @@ interface RegisterData {
 interface AuthContextType {
   user: User | null;
   isAuthenticated: boolean;
-  login: (email: string, password: string) => Promise<User>;
+  isLoading: boolean; // Thêm isLoading để chặn bug đá trang khi F5
+  login: (email: string, password: string, rememberMe: boolean) => Promise<User>; // Cập nhật tham số nhận vào
   register: (data: RegisterData) => Promise<void>;
   logout: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
-
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<User | null>(() => {
-    const savedUser = localStorage.getItem('user');
-    return savedUser ? JSON.parse(savedUser) : null;
-  });
+  const [user, setUser] = useState<User | null>(null);
+  const [isLoading, setIsLoading] = useState<boolean>(true); // Trạng thái chờ quét bộ nhớ khi chạy ứng dụng
 
-  const login = async (email: string, password: string): Promise<User> => {
+  // Chạy một lần duy nhất khi ứng dụng khởi chạy / reload (F5)
+  useEffect(() => {
+    const localUser = localStorage.getItem('user');
+    const sessionUser = sessionStorage.getItem('user');
+
+    if (localUser) {
+      setUser(JSON.parse(localUser));
+    } else if (sessionUser) {
+      setUser(JSON.parse(sessionUser));
+    }
+
+    setIsLoading(false); // Quét xong, tắt trạng thái loading
+  }, []);
+
+  const login = async (email: string, password: string, rememberMe: boolean): Promise<User> => {
     const response = await fetch(`${API_BASE_URL}/Auth/login`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ 
-        email: email.trim(), 
-        password: password.trim() 
+      body: JSON.stringify({
+        email: email.trim(),
+        password: password.trim()
       }),
     });
 
@@ -58,8 +71,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     const userData: User = await response.json();
     setUser(userData);
-    localStorage.setItem('user', JSON.stringify(userData));
-    localStorage.setItem('token', userData.token);
+
+    // Xử lý logic Ghi nhớ đăng nhập dựa trên checkbox
+    if (rememberMe) {
+      localStorage.setItem('user', JSON.stringify(userData));
+      localStorage.setItem('token', userData.token);
+      
+      sessionStorage.removeItem('user');
+      sessionStorage.removeItem('token');
+    } else {
+      sessionStorage.setItem('user', JSON.stringify(userData));
+      sessionStorage.setItem('token', userData.token);
+
+      localStorage.removeItem('user');
+      localStorage.removeItem('token');
+    }
 
     return userData;
   };
@@ -80,31 +106,40 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     const userData: User = await response.json();
     setUser(userData);
-    localStorage.setItem('user', JSON.stringify(userData));
-    localStorage.setItem('token', userData.token);
+    
+    // Đăng ký xong mặc định lưu tạm thời vào sessionStorage (hoặc đổi thành localStorage tuỳ bạn)
+    sessionStorage.setItem('user', JSON.stringify(userData));
+    sessionStorage.setItem('token', userData.token);
   };
 
   const logout = async () => {
     try {
-      const token = localStorage.getItem('token');
-      await fetch(`${API_BASE_URL}/Auth/logout`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
-      });
+      // Tìm token ở cả 2 kho lưu trữ để gửi lên API logout
+      const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+      
+      if (token) {
+        await fetch(`${API_BASE_URL}/Auth/logout`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          },
+        });
+      }
     } catch (error) {
-      console.error(error);
+      console.error('Lỗi khi gọi API logout:', error);
     } finally {
+      // Luôn dọn dẹp sạch sẽ dữ liệu ở Client bất kể API thành công hay thất bại
       setUser(null);
       localStorage.removeItem('user');
       localStorage.removeItem('token');
+      sessionStorage.removeItem('user');
+      sessionStorage.removeItem('token');
     }
   };
 
   return (
-    <AuthContext.Provider value={{ user, isAuthenticated: !!user, login, register, logout }}>
+    <AuthContext.Provider value={{ user, isAuthenticated: !!user, isLoading, login, register, logout }}>
       {children}
     </AuthContext.Provider>
   );

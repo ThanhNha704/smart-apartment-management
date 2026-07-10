@@ -21,15 +21,15 @@ interface Room {
   id: string;
   createdAt?: string;
   updatedAt?: string;
-  roomNumber: string;    
+  roomNumber: string;
   price: number;
   area: number;
-  maxOccupants: number;  
-  description: string;   
-  roomDeposit: number;   
-  floorId: string;       
-  status: RoomStatus;    
-  tenantName?: string | null; 
+  maxOccupants: number;
+  description: string;
+  roomDeposit: number;
+  floorNumber: string;
+  status: RoomStatus;
+  tenantName?: string | null;
 }
 
 // Interface của Floor lấy từ API /api/Floors
@@ -58,13 +58,15 @@ export default function RoomManagement() {
   const [loading, setLoading] = useState<boolean>(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState<string>('all');
-  
+
   // Trạng thái đóng/mở Dialog
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isRentDialogOpen, setIsRentDialogOpen] = useState(false);
   const [selectedRoom, setSelectedRoom] = useState<Room | null>(null);
-  
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [roomToDelete, setRoomToDelete] = useState<string | null>(null);
+
   // State quản lý Form phòng (Thêm / Sửa) -> Khớp với DTO /api/Rooms
   const [roomFormData, setRoomFormData] = useState({
     roomNumber: '',
@@ -82,7 +84,7 @@ export default function RoomManagement() {
     tenantName: '',
     startDate: '',
     endDate: '',
-    paymentDate: 5, 
+    paymentDate: 5,
     monthlyRent: 0
   });
 
@@ -90,7 +92,7 @@ export default function RoomManagement() {
   const fetchData = async () => {
     try {
       setLoading(true);
-      
+
       // Fetch danh sách phòng
       const roomsRes = await axios.get<Room[]>(`${API_BASE_URL}/Rooms`);
       setRooms(roomsRes.data);
@@ -149,7 +151,7 @@ export default function RoomManagement() {
       toast.success('Đã cập nhật thông tin phòng thành công!');
       setIsEditDialogOpen(false);
       setSelectedRoom(null);
-      fetchData(); 
+      fetchData();
     } catch (error: any) {
       console.error(error);
       const errMsg = error.response?.data?.join?.(', ') || error.response?.data || 'Cập nhật thông tin thất bại!';
@@ -177,7 +179,7 @@ export default function RoomManagement() {
         paymentDate: contractFormData.paymentDate,
         monthlyRent: contractFormData.monthlyRent
       });
-      
+
       toast.success(`Đã kích hoạt hợp đồng ${contractFormData.contractNumber} thành công!`);
       setIsRentDialogOpen(false);
       setSelectedRoom(null);
@@ -190,18 +192,24 @@ export default function RoomManagement() {
   };
 
   // 5. Xử lý Xóa phòng (DELETE /api/Rooms/{id})
-  const handleDeleteRoom = async (id: string) => {
-    if (window.confirm('Bạn có chắc chắn muốn xóa phòng này khỏi cơ sở dữ liệu backend?')) {
-      try {
-        await axios.delete(`${API_BASE_URL}/Rooms/${id}`);
-        toast.success('Đã xóa phòng thành công!');
-        fetchData();
-      } catch (error: any) {
-        console.error(error);
-        const errMsg = error.response?.data || 'Lỗi khi xóa phòng hoặc phòng đang có ràng buộc hợp đồng!';
-        toast.error(errMsg);
-      }
+  const confirmDeleteRoom = async () => {
+    if (!roomToDelete) return;
+    try {
+      await axios.delete(`${API_BASE_URL}/Users/${roomToDelete}`);
+      toast.success('Đã xóa phòng thành công!');
+      setIsDeleteDialogOpen(false);
+      setRoomToDelete(null);
+      fetchData(); // Hoặc fetchData() tùy theo hàm làm mới dữ liệu của bạn
+    } catch (error) {
+      console.error(error);
+      toast.error('Không thể xóa phòng này (Có thể liên quan đến ràng buộc dữ liệu hợp đồng).');
     }
+  };
+
+  // Hàm này gắn vào sự kiện onClick của nút "Xóa" dưới danh sách/bảng
+  const openDeleteModal = (id: string) => {
+    setRoomToDelete(id);
+    setIsDeleteDialogOpen(true);
   };
 
   // Mở form Sửa thông tin phòng và gán dữ liệu cũ vào state
@@ -213,7 +221,7 @@ export default function RoomManagement() {
       area: room.area,
       maxOccupants: room.maxOccupants,
       roomDeposit: room.roomDeposit,
-      floorId: room.floorId,
+      floorId: room.floorNumber,
       description: room.description || ''
     });
     setIsEditDialogOpen(true);
@@ -236,7 +244,7 @@ export default function RoomManagement() {
   // Logic Tìm kiếm và Lọc trên dữ liệu động lấy về từ Backend
   const filteredRooms = rooms.filter(room => {
     const matchesSearch = room.roomNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                          (room.tenantName && room.tenantName.toLowerCase().includes(searchTerm.toLowerCase()));
+      (room.tenantName && room.tenantName.toLowerCase().includes(searchTerm.toLowerCase()));
     const matchesFilter = filterStatus === 'all' || room.status.toString() === filterStatus;
     return matchesSearch && matchesFilter;
   });
@@ -263,7 +271,7 @@ export default function RoomManagement() {
     <div className="p-6 max-w-7xl mx-auto">
       <div className="mb-6">
         <h1 className="text-2xl font-semibold mb-1">Quản lý phòng</h1>
-        <p className="text-gray-600">Dữ liệu đồng bộ trực tiếp với Backend API</p>
+        <p className="text-gray-600">Quản lí phòng ở tòa nhà của bạn</p>
       </div>
 
       {/* Tìm kiếm và Thêm mới */}
@@ -292,14 +300,14 @@ export default function RoomManagement() {
             </select>
             <button
               onClick={() => {
-                setRoomFormData({ 
-                  roomNumber: '', 
-                  price: 2000000, 
-                  area: 20, 
-                  maxOccupants: 2, 
-                  roomDeposit: 2000000, 
-                  floorId: floors[0]?.id || '', 
-                  description: '' 
+                setRoomFormData({
+                  roomNumber: '',
+                  price: 2000000,
+                  area: 20,
+                  maxOccupants: 2,
+                  roomDeposit: 2000000,
+                  floorId: floors[0]?.id || '',
+                  description: ''
                 });
                 setIsAddDialogOpen(true);
               }}
@@ -325,7 +333,7 @@ export default function RoomManagement() {
                 <div>
                   <h3 className="text-xl font-semibold mb-1">{room.roomNumber}</h3>
                   <p className="text-gray-400 text-xs">
-                    Mã tầng: {floors.find(f => f.id === room.floorId)?.name || `Tầng (ID: ${room.floorId})`}
+                    Mã tầng: {floors.find(f => f.id === room.floorNumber)?.name || `Tầng (ID: ${room.floorNumber})`}
                   </p>
                 </div>
                 {getStatusBadge(room.status)}
@@ -371,7 +379,7 @@ export default function RoomManagement() {
                   </button>
                 ) : (
                   <button
-                    onClick={() => handleDeleteRoom(room.id)}
+                    onClick={() => openDeleteModal(room.id)}
                     className="flex-1 px-3 py-2 border border-red-300 text-red-600 rounded-lg hover:bg-red-50 flex items-center justify-center gap-2 text-sm"
                   >
                     <Trash2 className="w-4 h-4" /> Xóa
@@ -391,8 +399,8 @@ export default function RoomManagement() {
             <Dialog.Title className="text-xl font-semibold mb-4">Thêm phòng mới</Dialog.Title>
             <form className="space-y-4" onSubmit={handleCreateRoom}>
               <div>
-                <label className="block text-sm font-medium mb-1">Số phòng (roomNumber)</label>
-                <input type="text" className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" value={roomFormData.roomNumber} onChange={(e) => setRoomFormData({...roomFormData, roomNumber: e.target.value})} placeholder="P101" required />
+                <label className="block text-sm font-medium mb-1">Số phòng</label>
+                <input type="text" className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" value={roomFormData.roomNumber} onChange={(e) => setRoomFormData({ ...roomFormData, roomNumber: e.target.value })} placeholder="P101" required />
               </div>
               <div className="grid grid-cols-2 gap-2">
                 <div>
@@ -400,37 +408,37 @@ export default function RoomManagement() {
                   <select
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                     value={roomFormData.floorId}
-                    onChange={(e) => setRoomFormData({...roomFormData, floorId: e.target.value})}
+                    onChange={(e) => setRoomFormData({ ...roomFormData, floorId: e.target.value })}
                     required
                   >
                     <option value="">-- Chọn tầng --</option>
                     {floors.map(f => (
-                      <option key={f.id} value={f.id}>{f.name || `Tầng ${f.floorNumber}`}</option>
+                      <option key={f.id} value={f.id}>{`Tầng ${f.floorNumber}`}</option>
                     ))}
                   </select>
                 </div>
                 <div>
                   <label className="block text-sm font-medium mb-1">Số người tối đa</label>
-                  <input type="number" className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" value={roomFormData.maxOccupants} onChange={(e) => setRoomFormData({...roomFormData, maxOccupants: Number(e.target.value)})} min={1} required />
+                  <input type="number" className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" value={roomFormData.maxOccupants} onChange={(e) => setRoomFormData({ ...roomFormData, maxOccupants: Number(e.target.value) })} min={1} required />
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-2">
                 <div>
                   <label className="block text-sm font-medium mb-1">Diện tích (m²)</label>
-                  <input type="number" step="any" className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" value={roomFormData.area} onChange={(e) => setRoomFormData({...roomFormData, area: Number(e.target.value)})} min={1} required />
+                  <input type="number" step="any" className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" value={roomFormData.area} onChange={(e) => setRoomFormData({ ...roomFormData, area: Number(e.target.value) })} min={1} required />
                 </div>
                 <div>
                   <label className="block text-sm font-medium mb-1">Giá thuê (VNĐ)</label>
-                  <input type="number" className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" value={roomFormData.price} onChange={(e) => setRoomFormData({...roomFormData, price: Number(e.target.value)})} min={1} required />
+                  <input type="number" className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" value={roomFormData.price} onChange={(e) => setRoomFormData({ ...roomFormData, price: Number(e.target.value) })} min={1} required />
                 </div>
               </div>
               <div>
-                <label className="block text-sm font-medium mb-1">Tiền đặt cọc (roomDeposit)</label>
-                <input type="number" className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" value={roomFormData.roomDeposit} onChange={(e) => setRoomFormData({...roomFormData, roomDeposit: Number(e.target.value)})} min={0} required />
+                <label className="block text-sm font-medium mb-1">Tiền đặt cọc</label>
+                <input type="number" className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" value={roomFormData.roomDeposit} onChange={(e) => setRoomFormData({ ...roomFormData, roomDeposit: Number(e.target.value) })} min={0} required />
               </div>
               <div>
                 <label className="block text-sm font-medium mb-1">Mô tả phòng</label>
-                <textarea className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" rows={2} value={roomFormData.description} onChange={(e) => setRoomFormData({...roomFormData, description: e.target.value})} placeholder="Vị trí, trang thiết bị đi kèm..." />
+                <textarea className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" rows={2} value={roomFormData.description} onChange={(e) => setRoomFormData({ ...roomFormData, description: e.target.value })} placeholder="Vị trí, trang thiết bị đi kèm..." />
               </div>
               <div className="flex gap-2 pt-2">
                 <Dialog.Close className="flex-1 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">Hủy</Dialog.Close>
@@ -450,7 +458,7 @@ export default function RoomManagement() {
             <form className="space-y-4" onSubmit={handleSaveEdit}>
               <div>
                 <label className="block text-sm font-medium mb-1">Số phòng</label>
-                <input type="text" value={roomFormData.roomNumber} onChange={(e) => setRoomFormData({...roomFormData, roomNumber: e.target.value})} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" required />
+                <input type="text" value={roomFormData.roomNumber} onChange={(e) => setRoomFormData({ ...roomFormData, roomNumber: e.target.value })} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" required />
               </div>
               <div className="grid grid-cols-2 gap-2">
                 <div>
@@ -458,37 +466,37 @@ export default function RoomManagement() {
                   <select
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                     value={roomFormData.floorId}
-                    onChange={(e) => setRoomFormData({...roomFormData, floorId: e.target.value})}
+                    onChange={(e) => setRoomFormData({ ...roomFormData, floorId: e.target.value })}
                     required
                   >
                     <option value="">-- Chọn tầng --</option>
                     {floors.map(f => (
-                      <option key={f.id} value={f.id}>{f.name || `Tầng ${f.floorNumber}`}</option>
+                      <option key={f.id} value={f.id}>{`Tầng ${f.floorNumber}`}</option>
                     ))}
                   </select>
                 </div>
                 <div>
                   <label className="block text-sm font-medium mb-1">Số người tối đa</label>
-                  <input type="number" value={roomFormData.maxOccupants} onChange={(e) => setRoomFormData({...roomFormData, maxOccupants: Number(e.target.value)})} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" required />
+                  <input type="number" value={roomFormData.maxOccupants} onChange={(e) => setRoomFormData({ ...roomFormData, maxOccupants: Number(e.target.value) })} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" required />
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-2">
                 <div>
                   <label className="block text-sm font-medium mb-1">Diện tích (m²)</label>
-                  <input type="number" step="any" value={roomFormData.area} onChange={(e) => setRoomFormData({...roomFormData, area: Number(e.target.value)})} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" required />
+                  <input type="number" step="any" value={roomFormData.area} onChange={(e) => setRoomFormData({ ...roomFormData, area: Number(e.target.value) })} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" required />
                 </div>
                 <div>
                   <label className="block text-sm font-medium mb-1">Giá thuê (VNĐ)</label>
-                  <input type="number" value={roomFormData.price} onChange={(e) => setRoomFormData({...roomFormData, price: Number(e.target.value)})} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" required />
+                  <input type="number" value={roomFormData.price} onChange={(e) => setRoomFormData({ ...roomFormData, price: Number(e.target.value) })} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" required />
                 </div>
               </div>
               <div>
-                <label className="block text-sm font-medium mb-1">Tiền đặt cọc (roomDeposit)</label>
-                <input type="number" value={roomFormData.roomDeposit} onChange={(e) => setRoomFormData({...roomFormData, roomDeposit: Number(e.target.value)})} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" required />
+                <label className="block text-sm font-medium mb-1">Tiền đặt cọc</label>
+                <input type="number" value={roomFormData.roomDeposit} onChange={(e) => setRoomFormData({ ...roomFormData, roomDeposit: Number(e.target.value) })} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" required />
               </div>
               <div>
                 <label className="block text-sm font-medium mb-1">Mô tả</label>
-                <textarea value={roomFormData.description} onChange={(e) => setRoomFormData({...roomFormData, description: e.target.value})} className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" rows={2} />
+                <textarea value={roomFormData.description} onChange={(e) => setRoomFormData({ ...roomFormData, description: e.target.value })} className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" rows={2} />
               </div>
               <div className="flex gap-2 pt-2">
                 <Dialog.Close className="flex-1 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">Hủy</Dialog.Close>
@@ -512,15 +520,15 @@ export default function RoomManagement() {
             </p>
             <form className="space-y-4" onSubmit={handleSaveRent}>
               <div>
-                <label className="block text-sm font-medium mb-1">Mã số hợp đồng (contractNumber)</label>
-                <input type="text" value={contractFormData.contractNumber} onChange={(e) => setContractFormData({...contractFormData, contractNumber: e.target.value})} className="w-full px-3 py-2 border border-gray-300 bg-gray-50 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" required />
+                <label className="block text-sm font-medium mb-1">Mã số hợp đồng</label>
+                <input type="text" value={contractFormData.contractNumber} onChange={(e) => setContractFormData({ ...contractFormData, contractNumber: e.target.value })} className="w-full px-3 py-2 border border-gray-300 bg-gray-50 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" required />
               </div>
               <div>
-                <label className="block text-sm font-medium mb-1">Chọn Khách hàng thuê (tenantName)</label>
+                <label className="block text-sm font-medium mb-1">Chọn Khách hàng thuê</label>
                 <select
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                   value={contractFormData.tenantName}
-                  onChange={(e) => setContractFormData({...contractFormData, tenantName: e.target.value})}
+                  onChange={(e) => setContractFormData({ ...contractFormData, tenantName: e.target.value })}
                   required
                 >
                   <option value="">-- Chọn khách thuê --</option>
@@ -539,16 +547,16 @@ export default function RoomManagement() {
               <div className="grid grid-cols-2 gap-2">
                 <div>
                   <label className="block text-sm font-medium mb-1">Ngày bắt đầu</label>
-                  <input type="date" value={contractFormData.startDate} onChange={(e) => setContractFormData({...contractFormData, startDate: e.target.value})} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" required />
+                  <input type="date" value={contractFormData.startDate} onChange={(e) => setContractFormData({ ...contractFormData, startDate: e.target.value })} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" required />
                 </div>
                 <div>
                   <label className="block text-sm font-medium mb-1">Ngày kết thúc</label>
-                  <input type="date" value={contractFormData.endDate} onChange={(e) => setContractFormData({...contractFormData, endDate: e.target.value})} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" required />
+                  <input type="date" value={contractFormData.endDate} onChange={(e) => setContractFormData({ ...contractFormData, endDate: e.target.value })} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" required />
                 </div>
               </div>
               <div>
                 <label className="block text-sm font-medium mb-1">Ngày thanh toán định kỳ (hàng tháng)</label>
-                <input type="number" min={1} max={31} value={contractFormData.paymentDate} onChange={(e) => setContractFormData({...contractFormData, paymentDate: Number(e.target.value)})} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" required />
+                <input type="number" min={1} max={31} value={contractFormData.paymentDate} onChange={(e) => setContractFormData({ ...contractFormData, paymentDate: Number(e.target.value) })} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" required />
               </div>
 
               <div className="p-4 bg-blue-50 rounded-lg">
@@ -561,7 +569,7 @@ export default function RoomManagement() {
                   </p>
                 </div>
               </div>
-              
+
               <div className="flex gap-2 pt-2">
                 <Dialog.Close className="flex-1 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">Hủy</Dialog.Close>
                 <button type="submit" className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">Xác nhận & Tạo hợp đồng</button>
@@ -570,6 +578,34 @@ export default function RoomManagement() {
           </Dialog.Content>
         </Dialog.Portal>
       </Dialog.Root>
+
+      {/* Dialog Xác nhận xóa tài khoản */}
+            <Dialog.Root open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+              <Dialog.Portal>
+                <Dialog.Overlay className="fixed inset-0 bg-black/50 animate-fade-in" />
+                <Dialog.Content className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-white rounded-lg p-6 w-full max-w-sm shadow-xl border border-gray-200">
+                  <Dialog.Title className="text-lg font-semibold text-gray-900 mb-2">
+                    Xác nhận xóa phòng
+                  </Dialog.Title>
+      
+                  <p className="text-sm text-gray-500 mb-5">
+                    Bạn có chắc chắn muốn xóa tài khoản phòng này khỏi cơ sở dữ liệu? Hành động này không thể hoàn tác.
+                  </p>
+      
+                  <div className="flex gap-2">
+                    <Dialog.Close className="flex-1 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 text-sm font-medium transition-colors">
+                      Hủy
+                    </Dialog.Close>
+                    <button
+                      onClick={confirmDeleteRoom}
+                      className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 text-sm font-medium transition-colors"
+                    >
+                      Xác nhận xóa
+                    </button>
+                  </div>
+                </Dialog.Content>
+              </Dialog.Portal>
+            </Dialog.Root>
     </div>
   );
 }

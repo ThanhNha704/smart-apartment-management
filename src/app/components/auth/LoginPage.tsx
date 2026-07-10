@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router';
-import { Home, Lock, Mail, LogIn } from 'lucide-react';
+import { Home, Lock, Mail, LogIn, Eye, EyeOff } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { toast } from 'sonner';
 
@@ -9,6 +9,8 @@ export default function LoginPage() {
   const { login } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [rememberMe, setRememberMe] = useState(false); // 1. Tạo state lưu trạng thái ghi nhớ
+  const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -16,15 +18,11 @@ export default function LoginPage() {
     setIsLoading(true);
 
     try {
-      const user = await login(email, password);
+      // 2. Truyền thêm tham số rememberMe vào hàm login
+      await login(email, password, rememberMe); 
       toast.success('Đăng nhập thành công!');
-
-      // Kiểm tra quyền dựa trên roleLabel trả về từ Swagger API
-      if (user?.roleLabel === 'Landlord' || user?.role === 1) {
-        navigate('/dashboard');
-      } else {
-        navigate('/tenant/dashboard');
-      }
+      
+      navigate('/dashboard'); 
     } catch (error) {
       toast.error('Đăng nhập thất bại. Vui lòng kiểm tra lại tài khoản, mật khẩu!');
     } finally {
@@ -65,28 +63,45 @@ export default function LoginPage() {
               <div className="relative">
                 <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
                 <input
-                  type="password"
+                  type={showPassword ? "text" : "password"}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="••••••••"
-                  className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full pl-10 pr-12 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                   required
                 />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 focus:outline-none"
+                >
+                  {showPassword ? (
+                    <EyeOff className="w-5 h-5" />
+                  ) : (
+                    <Eye className="w-5 h-5" />
+                  )}
+                </button>
               </div>
             </div>
 
             <div className="flex items-center justify-between text-sm">
               <label className="flex items-center gap-2 cursor-pointer">
-                <input type="checkbox" className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500" />
+                {/* 3. Liên kết checkbox với state rememberMe */}
+                <input 
+                  type="checkbox" 
+                  checked={rememberMe}
+                  onChange={(e) => setRememberMe(e.target.checked)}
+                  className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500" 
+                />
                 <span className="text-gray-600">Ghi nhớ đăng nhập</span>
               </label>
-              <button
+              {/* <button
                 type="button"
                 onClick={() => navigate('/forgot-password')}
                 className="text-blue-600 hover:text-blue-700"
               >
                 Quên mật khẩu?
-              </button>
+              </button> */}
             </div>
 
             <button
@@ -108,7 +123,7 @@ export default function LoginPage() {
             </button>
           </form>
 
-          <div className="mt-6 text-center">
+          {/* <div className="mt-6 text-center">
             <p className="text-gray-600">
               Chưa có tài khoản?{' '}
               <button
@@ -118,7 +133,7 @@ export default function LoginPage() {
                 Đăng ký ngay
               </button>
             </p>
-          </div>
+          </div> */}
         </div>
       </div>
     </div>
