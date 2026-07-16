@@ -4,7 +4,7 @@ import * as Dialog from '@radix-ui/react-dialog';
 import { toast } from 'sonner';
 import { fetchApi } from '../../utils/api';
 
-// --- INTERFACES DỮ LIỆU ---
+// INTERFACES DỮ LIỆU
 interface ContractBackend {
   id: string;
   createdAt: string;
@@ -119,7 +119,7 @@ export default function ContractManagement() {
     }
   }, [selectedTenantId, tenants, isCreateDialogOpen]);
 
-  // --- POST: Tạo hợp đồng mới ---
+  // POST: Tạo hợp đồng mới
   const handleCreateContract = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
@@ -130,7 +130,7 @@ export default function ContractManagement() {
         startDate: createFormData.startDate ? new Date(createFormData.startDate).toISOString() : '',
         endDate: createFormData.endDate ? new Date(createFormData.endDate).toISOString() : '',
         paymentDate: createFormData.paymentDate,
-        price: createFormData.monthlyRent, // Khớp với trường 'price' của Backend Swagger
+        price: createFormData.monthlyRent,
       };
 
       const response = await fetchApi('/Contracts', {
@@ -154,7 +154,7 @@ export default function ContractManagement() {
     }
   };
 
-  // --- PUT: Thanh lý hợp đồng theo cấu trúc Swagger ---
+  // PUT: Thanh lý hợp đồng theo cấu trúc Swagger
   const handleTerminateContract = async () => {
     if (!contractToTerminate) return;
     try {
@@ -176,7 +176,7 @@ export default function ContractManagement() {
     }
   };
 
-  // --- PUT: Gia hạn hợp đồng gửi chuỗi ISO String chuẩn Swagger ---
+  // PUT: Gia hạn hợp đồng gửi chuỗi ISO String chuẩn Swagger
   const handleExtendContract = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedContract || !extendEndDate) return;
@@ -225,7 +225,7 @@ export default function ContractManagement() {
     return (
       <div className="flex flex-col items-center justify-center py-20 gap-2 text-gray-500">
         <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
-        <p className="text-sm font-medium">Đang đồng bộ dữ liệu hợp đồng từ Swagger...</p>
+        <p className="text-sm font-medium">Đang đồng bộ dữ liệu hợp đồng...</p>
       </div>
     );
   }
@@ -234,7 +234,7 @@ export default function ContractManagement() {
     <div className="p-6 max-w-7xl mx-auto">
       <div className="mb-6">
         <h1 className="text-2xl font-semibold mb-1">Quản lý hợp đồng</h1>
-        <p className="text-gray-600">Theo dõi thông tin, tạo mới và quản lý vòng đời hợp đồng phòng thuê</p>
+        <p className="text-gray-600">Theo dõi thông tin, tạo mới và quản lý thời hạn hợp đồng phòng thuê</p>
       </div>
 
       {/* Tìm kiếm & Bộ lọc */}
@@ -304,7 +304,7 @@ export default function ContractManagement() {
         )}
       </div>
 
-      {/* --- DIALOG CHI TIẾT HỢP ĐỒNG --- */}
+      {/* DIALOG CHI TIẾT HỢP ĐỒNG */}
       <Dialog.Root open={selectedContract !== null} onOpenChange={(open) => !open && setSelectedContract(null)}>
         <Dialog.Portal>
           <Dialog.Overlay className="fixed inset-0 bg-black/50 z-40" />
@@ -344,7 +344,7 @@ export default function ContractManagement() {
         </Dialog.Portal>
       </Dialog.Root>
 
-      {/* --- DIALOG TẠO MỚI (POST) --- */}
+      {/* DIALOG TẠO MỚI (POST) */}
       <Dialog.Root open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
         <Dialog.Portal>
           <Dialog.Overlay className="fixed inset-0 bg-black/50 z-40" />
@@ -412,7 +412,7 @@ export default function ContractManagement() {
         </Dialog.Portal>
       </Dialog.Root>
 
-      {/* --- DIALOG GIA HẠN HỢP ĐỒNG --- */}
+      {/* DIALOG GIA HẠN HỢP ĐỒNG */}
       <Dialog.Root open={isExtendDialogOpen} onOpenChange={setIsExtendDialogOpen}>
         <Dialog.Portal>
           <Dialog.Overlay className="fixed inset-0 bg-black/50 z-50" />
@@ -432,7 +432,7 @@ export default function ContractManagement() {
         </Dialog.Portal>
       </Dialog.Root>
 
-      {/* --- DIALOG XÁC NHẬN THANH LÝ HỢP ĐỒNG --- */}
+      {/* DIALOG XÁC NHẬN THANH LÝ HỢP ĐỒNG */}
       <Dialog.Root open={isTerminateDialogOpen} onOpenChange={setIsTerminateDialogOpen}>
         <Dialog.Portal>
           <Dialog.Overlay className="fixed inset-0 bg-black/50 z-50" />

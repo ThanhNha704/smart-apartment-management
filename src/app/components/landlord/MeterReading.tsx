@@ -3,7 +3,7 @@ import { Camera, Upload, Calendar, CheckCircle, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { fetchApi } from '../../utils/api'; 
 
-// --- INTERFACES DỮ LIỆU CHUẨN SWAGGER ---
+// INTERFACES
 interface Room {
   id: string;
   roomNumber: string;
@@ -35,7 +35,7 @@ export default function MeterReading() {
 
   const [selectedRoomNumber, setSelectedRoomNumber] = useState('');
   const [currentIndex, setCurrentIndex] = useState('');
-  const [meterType, setMeterType] = useState<string>('Điện'); // Đồng bộ string theo Swagger
+  const [meterType, setMeterType] = useState<string>('Điện');
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isScanning, setIsScanning] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -45,7 +45,6 @@ export default function MeterReading() {
     try {
       setIsLoading(true);
       
-      // Nếu có chọn phòng cụ thể, gọi endpoint lọc theo roomNumber của Swagger
       const readingsUrl = selectedRoomNumber 
         ? `/MeterReadings/room/${selectedRoomNumber}`
         : '/MeterReadings';
@@ -121,7 +120,7 @@ export default function MeterReading() {
     }
   };
 
-  // --- 3. Hàm POST: Xác nhận/Lưu thủ công chỉ số công tơ ---
+  // Hàm POST: Xác nhận/Lưu thủ công chỉ số công tơ
   const handleSubmitReading = async () => {
     if (!selectedRoomNumber || !currentIndex) {
       toast.error('Vui lòng chọn phòng và nhập số công tơ!');
@@ -202,7 +201,7 @@ export default function MeterReading() {
                 </div>
               </div>
 
-              {/* Bước 1: Chọn phòng */}
+              {/* Chọn phòng */}
               <div>
                 <label className="block text-sm font-medium mb-2 text-gray-700">Chọn phòng cần đọc</label>
                 <select
@@ -219,7 +218,7 @@ export default function MeterReading() {
                 </select>
               </div>
 
-              {/* Bước 2: Quét ảnh (OCR) qua input file thực tế */}
+              {/* Quét ảnh (OCR) qua input file thực tế */}
               <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center bg-gray-50 relative">
                 {isScanning ? (
                   <div className="space-y-3 py-4">
@@ -249,7 +248,7 @@ export default function MeterReading() {
                 )}
               </div>
 
-              {/* Bước 3: Số công tơ hiện tại */}
+              {/* Số công tơ hiện tại */}
               <div>
                 <label className="block text-sm font-medium mb-2 text-gray-700">Số công tơ hiện tại</label>
                 <input
@@ -273,7 +272,7 @@ export default function MeterReading() {
           </button>
         </div>
 
-        {/* LỊCH SỬ GHI SỐ THỰC TẾ TỪ API */}
+        {/* LỊCH SỬ GHI SỐ THỰC TẾ */}
         <div className="bg-white rounded-lg border border-gray-200 p-6 overflow-y-auto max-h-[600px]">
           <h3 className="font-semibold mb-4 text-gray-800">
             {selectedRoomNumber ? `Lịch sử ghi số phòng ${selectedRoomNumber}` : 'Lịch sử ghi số gần đây'}

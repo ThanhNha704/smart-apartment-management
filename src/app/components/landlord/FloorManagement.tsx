@@ -6,8 +6,8 @@ import { fetchApi } from '../../utils/api';
 
 // Định nghĩa Interface
 interface FloorItem {
-  id: string; // Mongo ObjectId
-  floorNumber: number; // int
+  id: string;
+  floorNumber: number;
   name: string;
   description?: string;
   roomCount: number;
@@ -24,7 +24,7 @@ interface ApiResponse {
 }
 
 export default function FloorManagement() {
-  // Quản lý dữ liệu tổng quan và danh sách tầng từ API
+  // Quản lý dữ liệu tổng quan và danh sách tầng
   const [apiData, setApiData] = useState<ApiResponse | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -39,11 +39,10 @@ export default function FloorManagement() {
   const [addFormData, setAddFormData] = useState({ floorNumber: '', roomCount: 0 });
   const [editFormData, setEditFormData] = useState({ floorNumber: '', roomCount: 0 });
 
-  // --- 1. Hàm GET: Lấy danh sách tầng sử dụng fetchApi chung ---
+  // Hàm GET: Lấy danh sách tầng
   const fetchFloors = async () => {
     try {
       setIsLoading(true);
-      // Sử dụng fetchApi chung, không cần truyền domain hay header Authorization nữa
       const response = await fetchApi('/Floors');
       if (!response.ok) throw new Error('Không thể tải dữ liệu');
       
@@ -67,7 +66,7 @@ export default function FloorManagement() {
     return Math.round((floor.occupiedRooms / floor.roomCount) * 100);
   };
 
-  // --- 2. Hàm POST: Thêm tầng mới sử dụng fetchApi chung ---
+  // Hàm POST: Thêm tầng mới
   const handleAddFloor = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
@@ -110,7 +109,7 @@ export default function FloorManagement() {
     setIsEditDialogOpen(true);
   };
 
-  // --- 3. Hàm PUT: Cập nhật thông tin tầng sử dụng fetchApi chung ---
+  // Hàm PUT: Cập nhật thông tin tầng
   const handleSaveEdit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedFloor) return;
@@ -145,7 +144,7 @@ export default function FloorManagement() {
     }
   };
 
-  // --- 4. Hàm DELETE: Thay thế axios bằng fetchApi chung ---
+  // Hàm DELETE: Xóa tầng
   const confirmDeleteFloor = async () => {
     if (!floorToDelete) return;
     try {

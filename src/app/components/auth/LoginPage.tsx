@@ -9,7 +9,7 @@ export default function LoginPage() {
   const { login } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [rememberMe, setRememberMe] = useState(false); // 1. Tạo state lưu trạng thái ghi nhớ
+  const [rememberMe, setRememberMe] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
@@ -18,11 +18,10 @@ export default function LoginPage() {
     setIsLoading(true);
 
     try {
-      // 2. Truyền thêm tham số rememberMe vào hàm login
-      await login(email, password, rememberMe); 
+      await login(email, password, rememberMe);
       toast.success('Đăng nhập thành công!');
-      
-      navigate('/dashboard'); 
+
+      navigate('/dashboard');
     } catch (error) {
       toast.error('Đăng nhập thất bại. Vui lòng kiểm tra lại tài khoản, mật khẩu!');
     } finally {
@@ -86,12 +85,12 @@ export default function LoginPage() {
 
             <div className="flex items-center justify-between text-sm">
               <label className="flex items-center gap-2 cursor-pointer">
-                {/* 3. Liên kết checkbox với state rememberMe */}
-                <input 
-                  type="checkbox" 
+                {/* Liên kết checkbox với state rememberMe */}
+                <input
+                  type="checkbox"
                   checked={rememberMe}
                   onChange={(e) => setRememberMe(e.target.checked)}
-                  className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500" 
+                  className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                 />
                 <span className="text-gray-600">Ghi nhớ đăng nhập</span>
               </label>

@@ -4,8 +4,8 @@ import { Toaster } from 'sonner';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 
 import LoginPage from './components/auth/LoginPage';
-import RegisterPage from './components/auth/RegisterPage';
-import ForgotPasswordPage from './components/auth/ForgotPasswordPage';
+// import RegisterPage from './components/auth/RegisterPage';
+// import ForgotPasswordPage from './components/auth/ForgotPasswordPage';
 
 import Sidebar from './components/landlord/Sidebar';
 import Dashboard from './components/landlord/Dashboard';
@@ -16,6 +16,8 @@ import TenantManagement from './components/landlord/TenantManagement';
 import ContractManagement from './components/landlord/ContractManagement';
 import MeterReading from './components/landlord/MeterReading';
 import MaintenanceRequests from './components/landlord/MaintenanceRequests';
+import Messages from './components/landlord/ChatManagement';
+import Notification from './components/landlord/NotificationManagement';
 import Settings from './components/landlord/Settings';
 
 function ProtectedRoute({ children }: { children: React.ReactNode; }) {
@@ -53,6 +55,8 @@ function LandlordLayout() {
           <Route path="/invoices" element={<InvoiceManagement />} />
           <Route path="/meter-reading" element={<MeterReading />} />
           <Route path="/maintenance" element={<MaintenanceRequests />} />
+          <Route path="/messages" element={<Messages />} />
+          <Route path="/notification" element={<Notification />} />
           <Route path="/settings" element={<Settings />} />
           {/* Tự động redirect các route không tồn tại trong dashboard về trang chủ */}
           <Route path="*" element={<Navigate to="/dashboard" replace />} />
@@ -76,12 +80,10 @@ function AppRoutes() {
 
   return (
     <Routes>
-      {/* Cập nhật logic chuyển hướng tự động tại các trang Auth (Đã bỏ check role) */}
       <Route path="/login" element={isAuthenticated ? <Navigate to="/dashboard" replace /> : <LoginPage />} />
-      <Route path="/register" element={isAuthenticated ? <Navigate to="/dashboard" replace /> : <RegisterPage />} />
-      <Route path="/forgot-password" element={isAuthenticated ? <Navigate to="/dashboard" replace /> : <ForgotPasswordPage />} />
+      {/* <Route path="/register" element={isAuthenticated ? <Navigate to="/dashboard" replace /> : <RegisterPage />} /> */}
+      {/* <Route path="/forgot-password" element={isAuthenticated ? <Navigate to="/dashboard" replace /> : <ForgotPasswordPage />} /> */}
 
-      {/* Tuyến đường bảo vệ dành cho hệ thống quản lý */}
       <Route path="/*" element={
         <ProtectedRoute>
           <LandlordLayout />

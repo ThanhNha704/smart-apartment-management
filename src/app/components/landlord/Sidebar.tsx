@@ -4,6 +4,8 @@ import {
   Building2,
   FileText,
   Users,
+  MessageCircleMore,
+  Bell,
   Gauge,
   Settings as SettingsIcon,
   Menu,
@@ -30,6 +32,8 @@ const menuItems = [
   { path: '/invoices', icon: FileText, label: 'Hóa đơn' },
   { path: '/meter-reading', icon: Gauge, label: 'Đọc công tơ' },
   { path: '/maintenance', icon: Wrench, label: 'Yêu cầu sửa chữa' },
+  { path: '/messages', icon: MessageCircleMore, label: 'Tin nhắn' },
+  { path: '/notification', icon: Bell, label: 'Thông báo' },
   { path: '/settings', icon: SettingsIcon, label: 'Cài đặt' },
 ];
 

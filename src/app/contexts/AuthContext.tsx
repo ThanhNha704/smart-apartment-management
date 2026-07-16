@@ -1,6 +1,5 @@
 import { createContext, useContext, useState, useEffect, type ReactNode } from 'react';
-
-export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
+import { fetchApi } from '../utils/api';
 
 interface User {
   id: string;
@@ -26,8 +25,8 @@ interface RegisterData {
 interface AuthContextType {
   user: User | null;
   isAuthenticated: boolean;
-  isLoading: boolean; // Thêm isLoading để chặn bug đá trang khi F5
-  login: (email: string, password: string, rememberMe: boolean) => Promise<User>; // Cập nhật tham số nhận vào
+  isLoading: boolean;
+  login: (email: string, password: string, rememberMe: boolean) => Promise<User>;
   register: (data: RegisterData) => Promise<void>;
   logout: () => Promise<void>;
 }
@@ -36,7 +35,7 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
-  const [isLoading, setIsLoading] = useState<boolean>(true); // Trạng thái chờ quét bộ nhớ khi chạy ứng dụng
+  const [isLoading, setIsLoading] = useState<boolean>(true);
 
   // Chạy một lần duy nhất khi ứng dụng khởi chạy / reload (F5)
   useEffect(() => {
@@ -49,15 +48,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setUser(JSON.parse(sessionUser));
     }
 
-    setIsLoading(false); // Quét xong, tắt trạng thái loading
+    setIsLoading(false);
   }, []);
 
   const login = async (email: string, password: string, rememberMe: boolean): Promise<User> => {
-    const response = await fetch(`${API_BASE_URL}/Auth/login`, {
+    const response = await fetchApi('/Auth/login', {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
       body: JSON.stringify({
         email: email.trim(),
         password: password.trim()
@@ -72,7 +68,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const userData: User = await response.json();
     setUser(userData);
 
-    // Xử lý logic Ghi nhớ đăng nhập dựa trên checkbox
+    // Xử lý lưu trữ thông tin dựa trên checkbox Ghi nhớ đăng nhập
     if (rememberMe) {
       localStorage.setItem('user', JSON.stringify(userData));
       localStorage.setItem('token', userData.token);
@@ -91,11 +87,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const register = async (data: RegisterData): Promise<void> => {
-    const response = await fetch(`${API_BASE_URL}/Auth/register`, {
+    const response = await fetchApi('/Auth/register', {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
       body: JSON.stringify(data),
     });
 
@@ -107,29 +100,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const userData: User = await response.json();
     setUser(userData);
     
-    // Đăng ký xong mặc định lưu tạm thời vào sessionStorage (hoặc đổi thành localStorage tuỳ bạn)
     sessionStorage.setItem('user', JSON.stringify(userData));
     sessionStorage.setItem('token', userData.token);
   };
 
   const logout = async () => {
     try {
-      // Tìm token ở cả 2 kho lưu trữ để gửi lên API logout
-      const token = localStorage.getItem('token') || sessionStorage.getItem('token');
-      
-      if (token) {
-        await fetch(`${API_BASE_URL}/Auth/logout`, {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json'
-          },
-        });
-      }
+      await fetchApi('/Auth/logout', {
+        method: 'POST',
+      });
     } catch (error) {
       console.error('Lỗi khi gọi API logout:', error);
     } finally {
-      // Luôn dọn dẹp sạch sẽ dữ liệu ở Client bất kể API thành công hay thất bại
+      // Luôn dọn dẹp sạch sẽ dữ liệu ở Client
       setUser(null);
       localStorage.removeItem('user');
       localStorage.removeItem('token');

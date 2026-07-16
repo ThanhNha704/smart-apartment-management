@@ -2,9 +2,9 @@ import { useState, useEffect } from 'react';
 import { Search, Plus, Eye, QrCode, CheckCircle, Clock, XCircle, Trash2, Loader2 } from 'lucide-react';
 import * as Dialog from '@radix-ui/react-dialog';
 import { toast } from 'sonner';
-import { fetchApi } from '../../utils/api'; 
+import { fetchApi } from '../../utils/api';
 
-// Interface khớp 100% với Response Schema từ Swagger GET /api/Invoices
+// Interface
 interface Invoice {
   id: string;
   createdAt: string;
@@ -13,7 +13,7 @@ interface Invoice {
   roomNumber: string;
   tenantName: string;
   billingPeriod: string;
-  dueTime: string; // Đồng bộ theo tên thuộc tính trong Swagger UI
+  dueTime: string;
   status: number;  // 0 = Chờ thanh toán, 1 = Đã thanh toán, 2 = Quá hạn
   statusLabel: string;
   roomPrice: number;
@@ -51,20 +51,20 @@ export default function InvoiceManagement() {
   const [isLoading, setIsLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState<string>('all');
-  
+
   // States Modal quản lý
   const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
   const [showQRDialog, setShowQRDialog] = useState(false);
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [invoiceToDelete, setInvoiceToDelete] = useState<Invoice | null>(null);
-  
+
   // Form State & Select State
   const [selectedRoomId, setSelectedRoomId] = useState('');
   const [selectedTenantId, setSelectedTenantId] = useState('');
   const [createFormData, setCreateFormData] = useState(blankCreateFormData);
 
-  // --- 1. Hàm GET: Tải tất cả hóa đơn, phòng và khách thuê ---
+  // Hàm GET: Tải tất cả hóa đơn, phòng và khách thuê
   const loadInitialData = async () => {
     try {
       setIsLoading(true);
@@ -108,7 +108,7 @@ export default function InvoiceManagement() {
     }
   }, [selectedTenantId, tenants]);
 
-  // --- 2. Hàm POST: Gửi dữ liệu tạo hóa đơn mới lên Swagger Server ---
+  // Hàm POST: Gửi dữ liệu tạo hóa đơn mới lên Swagger Server
   const handleCreateInvoice = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!createFormData.roomNumber || !createFormData.tenantName || !createFormData.dueTime) {
@@ -131,7 +131,7 @@ export default function InvoiceManagement() {
       waterPrice: createFormData.waterPrice,
       serviceFee: createFormData.serviceFee,
       amount: totalAmount,
-      dueTime: new Date(createFormData.dueTime).toISOString() // Chuyển sang định dạng ISO cho Swagger
+      dueTime: new Date(createFormData.dueTime).toISOString()
     };
 
     try {
@@ -139,7 +139,7 @@ export default function InvoiceManagement() {
         method: 'POST',
         body: JSON.stringify(payload)
       });
-      
+
       if (response.ok) {
         toast.success('Đã lưu hóa đơn thực tế lên hệ thống thành công!');
         setIsCreateDialogOpen(false);
@@ -156,7 +156,7 @@ export default function InvoiceManagement() {
     }
   };
 
-  // --- 3. Hàm PUT: Cập nhật trạng thái thanh toán (/api/Invoices/{id}/pay) ---
+  // Hàm PUT: Cập nhật trạng thái thanh toán (/api/Invoices/{id}/pay)
   const handlePayInvoice = async (id: string) => {
     try {
       const response = await fetchApi(`/Invoices/${id}/pay`, { method: 'PUT' });
@@ -171,7 +171,7 @@ export default function InvoiceManagement() {
     }
   };
 
-  // --- 4. Hàm DELETE: Gỡ bỏ hóa đơn khỏi Swagger Server ---
+  // Hàm DELETE: Gỡ bỏ hóa đơn
   const handleDeleteInvoice = async () => {
     if (!invoiceToDelete) return;
     try {
@@ -189,8 +189,8 @@ export default function InvoiceManagement() {
 
   const filteredInvoices = invoices.filter(invoice => {
     const matchesSearch = (invoice.invoiceNumber?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
-                          (invoice.tenantName?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
-                          (invoice.roomNumber?.toLowerCase() || '').includes(searchTerm.toLowerCase());
+      (invoice.tenantName?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
+      (invoice.roomNumber?.toLowerCase() || '').includes(searchTerm.toLowerCase());
     const matchesFilter = filterStatus === 'all' || String(invoice.status) === filterStatus;
     return matchesSearch && matchesFilter;
   });
@@ -280,7 +280,7 @@ export default function InvoiceManagement() {
                 ) : (
                   filteredInvoices.map((invoice) => (
                     <tr key={invoice.id} className="hover:bg-gray-50 transition-colors">
-                      <td className="px-6 py-4 font-mono font-medium">{invoice.invoiceNumber || `ID: ${invoice.id.slice(0,8)}`}</td>
+                      <td className="px-6 py-4 font-mono font-medium">{invoice.invoiceNumber || `ID: ${invoice.id.slice(0, 8)}`}</td>
                       <td className="px-6 py-4 font-semibold">Phòng {invoice.roomNumber}</td>
                       <td className="px-6 py-4">{invoice.tenantName}</td>
                       <td className="px-6 py-4">{invoice.billingPeriod}</td>
@@ -405,39 +405,39 @@ export default function InvoiceManagement() {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block font-medium mb-1 text-gray-700">Kỳ thông báo đóng tiền <span className="text-red-500">*</span></label>
-                  <input type="text" value={createFormData.billingPeriod} onChange={(e) => setCreateFormData({...createFormData, billingPeriod: e.target.value})} className="w-full px-3 py-2 border border-gray-300 rounded-lg" placeholder="Ví dụ: Tháng 07/2026" required />
+                  <input type="text" value={createFormData.billingPeriod} onChange={(e) => setCreateFormData({ ...createFormData, billingPeriod: e.target.value })} className="w-full px-3 py-2 border border-gray-300 rounded-lg" placeholder="Ví dụ: Tháng 07/2026" required />
                 </div>
                 <div>
                   <label className="block font-medium mb-1 text-gray-700">Hạn cuối đóng tiền <span className="text-red-500">*</span></label>
-                  <input type="date" value={createFormData.dueTime} onChange={(e) => setCreateFormData({...createFormData, dueTime: e.target.value})} className="w-full px-3 py-2 border border-gray-300 rounded-lg" required />
+                  <input type="date" value={createFormData.dueTime} onChange={(e) => setCreateFormData({ ...createFormData, dueTime: e.target.value })} className="w-full px-3 py-2 border border-gray-300 rounded-lg" required />
                 </div>
               </div>
 
               <div className="grid grid-cols-2 gap-4 border-t pt-3">
                 <div>
                   <label className="block font-medium mb-1 text-gray-600">Điện tiêu thụ (kWh)</label>
-                  <input type="number" value={createFormData.electricUsage} onChange={(e) => setCreateFormData({...createFormData, electricUsage: Number(e.target.value)})} className="w-full px-3 py-2 border border-gray-300 rounded-lg" required />
+                  <input type="number" value={createFormData.electricUsage} onChange={(e) => setCreateFormData({ ...createFormData, electricUsage: Number(e.target.value) })} className="w-full px-3 py-2 border border-gray-300 rounded-lg" required />
                 </div>
                 <div>
                   <label className="block font-medium mb-1 text-gray-600">Đơn giá điện (₫/kWh)</label>
-                  <input type="number" value={createFormData.electricPrice} onChange={(e) => setCreateFormData({...createFormData, electricPrice: Number(e.target.value)})} className="w-full px-3 py-2 border border-gray-300 rounded-lg" required />
+                  <input type="number" value={createFormData.electricPrice} onChange={(e) => setCreateFormData({ ...createFormData, electricPrice: Number(e.target.value) })} className="w-full px-3 py-2 border border-gray-300 rounded-lg" required />
                 </div>
               </div>
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block font-medium mb-1 text-gray-600">Nước tiêu thụ (m³)</label>
-                  <input type="number" value={createFormData.waterUsage} onChange={(e) => setCreateFormData({...createFormData, waterUsage: Number(e.target.value)})} className="w-full px-3 py-2 border border-gray-300 rounded-lg" required />
+                  <input type="number" value={createFormData.waterUsage} onChange={(e) => setCreateFormData({ ...createFormData, waterUsage: Number(e.target.value) })} className="w-full px-3 py-2 border border-gray-300 rounded-lg" required />
                 </div>
                 <div>
                   <label className="block font-medium mb-1 text-gray-600">Đơn giá nước (₫/m³)</label>
-                  <input type="number" value={createFormData.waterPrice} onChange={(e) => setCreateFormData({...createFormData, waterPrice: Number(e.target.value)})} className="w-full px-3 py-2 border border-gray-300 rounded-lg" required />
+                  <input type="number" value={createFormData.waterPrice} onChange={(e) => setCreateFormData({ ...createFormData, waterPrice: Number(e.target.value) })} className="w-full px-3 py-2 border border-gray-300 rounded-lg" required />
                 </div>
               </div>
 
               <div>
                 <label className="block font-medium mb-1 text-gray-700">Cộng phí dịch vụ khác (₫)</label>
-                <input type="number" value={createFormData.serviceFee} onChange={(e) => setCreateFormData({...createFormData, serviceFee: Number(e.target.value)})} className="w-full px-3 py-2 border border-gray-300 rounded-lg" required />
+                <input type="number" value={createFormData.serviceFee} onChange={(e) => setCreateFormData({ ...createFormData, serviceFee: Number(e.target.value) })} className="w-full px-3 py-2 border border-gray-300 rounded-lg" required />
               </div>
 
               <div className="p-4 bg-blue-50 border border-gray-300 border-blue-100 rounded-lg flex justify-between items-center text-sm">
@@ -462,7 +462,7 @@ export default function InvoiceManagement() {
           <Dialog.Overlay className="fixed inset-0 bg-black/50 z-50" />
           <Dialog.Content aria-describedby={undefined} className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-white rounded-lg p-6 w-full max-w-sm z-50 text-sm shadow-2xl">
             <Dialog.Title className="text-lg font-bold text-gray-900 mb-2">Hủy bỏ hóa đơn vĩnh viễn</Dialog.Title>
-            <p className="text-gray-500 mb-4">Bạn chắc chắn muốn loại bỏ mã hóa đơn <strong className="text-gray-900">{invoiceToDelete?.invoiceNumber || invoiceToDelete?.id.slice(0,8)}</strong>? Thao tác này sẽ xóa vĩnh viễn trên Swagger Server.</p>
+            <p className="text-gray-500 mb-4">Bạn chắc chắn muốn loại bỏ mã hóa đơn <strong className="text-gray-900">{invoiceToDelete?.invoiceNumber || invoiceToDelete?.id.slice(0, 8)}</strong>? Thao tác này sẽ xóa vĩnh viễn trên Swagger Server.</p>
             <div className="flex gap-2">
               <Dialog.Close className="flex-1 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 font-medium">Hủy</Dialog.Close>
               <button onClick={handleDeleteInvoice} className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg font-medium hover:bg-red-700">Xác nhận xóa</button>

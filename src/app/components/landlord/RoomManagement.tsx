@@ -4,7 +4,7 @@ import * as Dialog from '@radix-ui/react-dialog';
 import { toast } from 'sonner';
 import { fetchApi } from '../../utils/api'; 
 
-// Định nghĩa Enum trạng thái phòng theo chuẩn Swagger Backend
+// Định nghĩa trạng thái phòng
 const RoomStatus = {
   Vacant: 0,
   Occupied: 1,
@@ -13,7 +13,7 @@ const RoomStatus = {
 
 type RoomStatus = typeof RoomStatus[keyof typeof RoomStatus];
 
-// Interface chuẩn theo đúng Schema mẫu của API /api/Rooms từ Swagger
+// Interface của Room
 interface Room {
   id: string;
   createdAt?: string;
@@ -24,13 +24,13 @@ interface Room {
   maxOccupants: number;
   description?: string;
   roomDeposit: number;
-  floorNumber: number; // Đã sửa từ string thành number theo chuẩn GET Swagger
+  floorNumber: number;
   status: RoomStatus;
-  statusName?: string; // Bổ sung trường từ Swagger mẫu
+  statusName?: string;
   tenantName?: string | null;
 }
 
-// Interface của Floor lấy từ API /api/Floors
+// Interface của Floor
 interface FloorItem {
   id: string;
   floorNumber: number;
@@ -39,7 +39,7 @@ interface FloorItem {
   roomCount: number;
 }
 
-// Interface của User/Tenant lấy từ API /api/Users
+// Interface của User/Tenant
 interface UserItem {
   id: string;
   name: string;
@@ -65,18 +65,18 @@ export default function RoomManagement() {
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [roomToDelete, setRoomToDelete] = useState<string | null>(null);
 
-  // State quản lý Form phòng (Thêm / Sửa) -> Giữ nguyên để phục vụ giao diện cũ
+  // State quản lý Form phòng (Thêm / Sửa)
   const [roomFormData, setRoomFormData] = useState({
     roomNumber: '',
     price: 0,
     area: 0,
     maxOccupants: 2,
-    roomDeposit: 0, // Giữ lại ở giao diện để không lỗi hiển thị đầu vào
+    roomDeposit: 0,
     floorId: '',
     description: ''
   });
 
-  // State quản lý Form hợp đồng -> Khớp với POST /api/Contracts
+  // State quản lý Form hợp đồng
   const [contractFormData, setContractFormData] = useState({
     contractNumber: '',
     tenantName: '',
@@ -86,7 +86,7 @@ export default function RoomManagement() {
     monthlyRent: 0
   });
 
-  // --- 1. Hàm GET: Lấy tất cả dữ liệu cần thiết qua fetchApi ---
+  // Hàm GET: Lấy tất cả dữ liệu cần thiết
   const fetchData = async () => {
     try {
       setLoading(true);
@@ -103,7 +103,7 @@ export default function RoomManagement() {
       const floorsData = await floorsRes.json();
       setFloors(floorsData.floors || []);
 
-      // Fetch danh sách người dùng (để chọn người thuê hợp lệ)
+      // Fetch danh sách người dùng
       const usersRes = await fetchApi('/Users');
       if (!usersRes.ok) throw new Error('Không thể tải danh sách khách hàng');
       const usersData = await usersRes.json();
@@ -120,7 +120,7 @@ export default function RoomManagement() {
     fetchData();
   }, []);
 
-  // --- 2. Hàm POST: Xử lý Thêm phòng mới (/Rooms) ---
+  //Hàm POST: Xử lý Thêm phòng mới
   const handleCreateRoom = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!roomFormData.floorId) {
@@ -128,7 +128,6 @@ export default function RoomManagement() {
       return;
     }
     try {
-      // Loại bỏ roomDeposit ra khỏi payload gửi lên vì schema POST của backend không có trường này
       const { roomDeposit, ...postPayload } = roomFormData;
 
       const response = await fetchApi('/Rooms', {
@@ -137,7 +136,7 @@ export default function RoomManagement() {
       });
 
       if (response.ok) {
-        toast.success('Đã thêm phòng mới lên hệ thống backend!');
+        toast.success('Đã thêm phòng mới lên hệ thống!');
         setIsAddDialogOpen(false);
         setRoomFormData({ roomNumber: '', price: 0, area: 0, maxOccupants: 2, roomDeposit: 0, floorId: '', description: '' });
         fetchData();
@@ -152,7 +151,7 @@ export default function RoomManagement() {
     }
   };
 
-  // --- 3. Hàm PUT: Xử lý Sửa thông tin phòng (/Rooms/{id}) ---
+  // Hàm PUT: Xử lý Sửa thông tin phòng (/Rooms/{id})
   const handleSaveEdit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedRoom) return;
@@ -162,7 +161,6 @@ export default function RoomManagement() {
     }
 
     try {
-      // Loại bỏ roomDeposit ra khỏi payload gửi lên vì schema PUT của backend không có trường này
       const { roomDeposit, ...putPayload } = roomFormData;
 
       const response = await fetchApi(`/Rooms/${selectedRoom.id}`, {
@@ -186,7 +184,7 @@ export default function RoomManagement() {
     }
   };
 
-  // --- 4. Hàm POST: Xử lý Lập hợp đồng & Cho thuê phòng (/Contracts) ---
+  // Hàm POST: Xử lý Lập hợp đồng & Cho thuê phòng (/Contracts)
   const handleSaveRent = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedRoom) return;
@@ -225,7 +223,7 @@ export default function RoomManagement() {
     }
   };
 
-  // --- 5. Hàm DELETE: Xóa phòng ---
+  // Hàm DELETE: Xóa phòng
   const confirmDeleteRoom = async () => {
     if (!roomToDelete) return;
     try {

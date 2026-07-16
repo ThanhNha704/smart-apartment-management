@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Search, CheckCircle, Clock, Wrench, AlertCircle, Loader2 } from 'lucide-react';
+import { Search, CheckCircle, Clock, Wrench, AlertCircle } from 'lucide-react';
 import * as Dialog from '@radix-ui/react-dialog';
 import { toast } from 'sonner';
 import { fetchApi } from '../../utils/api';
@@ -34,7 +34,7 @@ export default function MaintenanceRequests() {
   const [filterStatus, setFilterStatus] = useState<string>('all');
   const [selectedRequest, setSelectedRequest] = useState<MaintenanceItem | null>(null);
 
-  // Hàm GET: Lấy dữ liệu thời gian thực qua fetchApi dùng chung
+  // Hàm GET: Lấy dữ liệu
   const fetchRequests = async () => {
     try {
       setIsLoading(true);

@@ -2,9 +2,9 @@ import { useState, useEffect } from 'react';
 import { Search, Plus, Edit, Trash2, Phone, Mail, MapPin, Loader2, Eye, EyeOff, CreditCard, Calendar } from 'lucide-react';
 import * as Dialog from '@radix-ui/react-dialog';
 import { toast } from 'sonner';
-import { fetchApi } from '../../utils/api'; 
+import { fetchApi } from '../../utils/api';
 
-// Interface khớp 100% với Schema mẫu từ Swagger Backend mới
+// Interface
 interface UserTenant {
   id: string;
   createdAt: string;
@@ -16,7 +16,7 @@ interface UserTenant {
   idCard: string;
   avatarUrl: string | null;
   address: string;
-  dateOfBirth: string; // Thêm ngày sinh từ Swagger
+  dateOfBirth: string;
   roomId: string | null;
   roomNumber: string | null;
   refreshToken?: string | null;
@@ -25,7 +25,7 @@ interface UserTenant {
   isActive: boolean;
 }
 
-// Cấu trúc Form chuẩn dùng cho POST và PUT request body theo hình ảnh mới
+// Cấu trúc Form
 const blankTenantFormData = {
   name: '',
   password: '',
@@ -33,7 +33,7 @@ const blankTenantFormData = {
   phoneNumber: '',
   idCard: '',
   address: '',
-  dateOfBirth: '', // Thêm ngày sinh vào form
+  dateOfBirth: '',
 };
 
 export default function TenantManagement() {
@@ -52,7 +52,7 @@ export default function TenantManagement() {
   const [formData, setFormData] = useState(blankTenantFormData);
   const [selectedTenantId, setSelectedTenantId] = useState<string | null>(null);
 
-  // Lấy danh sách người dùng qua fetchApi
+  // Lấy danh sách người dùng
   const fetchTenants = async () => {
     try {
       setLoading(true);
@@ -104,7 +104,7 @@ export default function TenantManagement() {
   // Mở modal chỉnh sửa và đổ dữ liệu
   const openEditModal = (tenant: UserTenant) => {
     setSelectedTenantId(tenant.id);
-    
+
     // Định dạng chuỗi ngày sinh thích hợp để điền vào <input type="date" /> (YYYY-MM-DD)
     let formattedDate = '';
     if (tenant.dateOfBirth) {
