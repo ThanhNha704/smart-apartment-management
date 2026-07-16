@@ -1,12 +1,10 @@
 import { useState, useEffect } from 'react';
-import { Search, CheckCircle, Clock, Wrench, AlertCircle } from 'lucide-react';
+import { Search, CheckCircle, Clock, Wrench, AlertCircle, Loader2 } from 'lucide-react';
 import * as Dialog from '@radix-ui/react-dialog';
 import { toast } from 'sonner';
-import axios from 'axios';
+import { fetchApi } from '../../utils/api';
 
-// Cấu hình Endpoint thật từ hệ thống của bạn
-export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
-
+// INTERFACES DỮ LIỆU ĐÃ CHUẨN BACKEND
 interface MaintenanceItem {
   id: string;
   requestNumber: string;
@@ -31,39 +29,19 @@ interface ApiResponse {
 
 export default function MaintenanceRequests() {
   const [apiData, setApiData] = useState<ApiResponse | null>(null);
-  const [loading, setIsLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState<string>('all');
   const [selectedRequest, setSelectedRequest] = useState<MaintenanceItem | null>(null);
 
-  // Hàm Helper lấy token nhanh để gán vào request bảo mật
-  const getAuthHeaders = () => {
-    const token = localStorage.getItem('token');
-    return {
-      headers: {
-        'Content-Type': 'application/json',
-        ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
-      },
-    };
-  };
-
-  // 1. Lấy dữ liệu thời gian thực từ API Dashboard / Maintenance
+  // Hàm GET: Lấy dữ liệu thời gian thực qua fetchApi dùng chung
   const fetchRequests = async () => {
     try {
       setIsLoading(true);
-      const token = localStorage.getItem('token');
-
-      const response = await fetch(`${API_BASE_URL}/MaintenanceRequests`, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
-        },
-      });
-
+      const response = await fetchApi('/MaintenanceRequests');
+      
       if (!response.ok) throw new Error('Không thể tải dữ liệu');
 
-      // SỬA TẠI ĐÂY: API trả về Object ApiResponse (chứa total, pending, items...) chứ không phải mảng trực tiếp
       const data: ApiResponse = await response.json();
       setApiData(data);
     } catch (error) {
@@ -78,26 +56,40 @@ export default function MaintenanceRequests() {
     fetchRequests();
   }, []);
 
-  // 2. SỬA ĐƯỜNG DẪN: Gọi API PUT /MaintenanceRequests/{id}/start để bắt đầu xử lý
+  // Hàm PUT: Gọi API /MaintenanceRequests/{id}/start để bắt đầu xử lý
   const handleStartProcess = async (id: string) => {
     try {
-      await axios.put(`${API_BASE_URL}/MaintenanceRequests/${id}/start`, {}, getAuthHeaders());
-      toast.success('Đã chuyển trạng thái sang Đang xử lý!');
-      setSelectedRequest(null);
-      fetchRequests(); // Cập nhật lại giao diện dữ liệu mới
+      const response = await fetchApi(`/MaintenanceRequests/${id}/start`, {
+        method: 'PUT',
+      });
+
+      if (response.ok) {
+        toast.success('Đã chuyển trạng thái sang Đang xử lý!');
+        setSelectedRequest(null);
+        fetchRequests();
+      } else {
+        throw new Error('Cập nhật thất bại');
+      }
     } catch (error) {
       console.error(error);
       toast.error('Lỗi khi cập nhật trạng thái xử lý!');
     }
   };
 
-  // 3. SỬA ĐƯỜNG DẪN: Gọi API PUT /MaintenanceRequests/{id}/complete để hoàn thành xử lý
+  // Hàm PUT: Gọi API /MaintenanceRequests/{id}/complete để hoàn thành xử lý
   const handleCompleteProcess = async (id: string) => {
     try {
-      await axios.put(`${API_BASE_URL}/MaintenanceRequests/${id}/complete`, {}, getAuthHeaders());
-      toast.success('Đã hoàn thành xử lý yêu cầu!');
-      setSelectedRequest(null);
-      fetchRequests(); // Cập nhật lại giao diện dữ liệu mới
+      const response = await fetchApi(`/MaintenanceRequests/${id}/complete`, {
+        method: 'PUT',
+      });
+
+      if (response.ok) {
+        toast.success('Đã hoàn thành xử lý yêu cầu!');
+        setSelectedRequest(null);
+        fetchRequests();
+      } else {
+        throw new Error('Cập nhật thất bại');
+      }
     } catch (error) {
       console.error(error);
       toast.error('Lỗi khi hoàn thành yêu cầu sửa chữa!');
@@ -117,14 +109,14 @@ export default function MaintenanceRequests() {
 
   const getStatusBadge = (status: number, label: string) => {
     const configs = {
-      0: { icon: Clock, className: 'bg-yellow-100 text-yellow-700' },       // Chờ xử lý / Pending
-      1: { icon: Wrench, className: 'bg-blue-100 text-blue-700' },         // Đang xử lý / In Progress
-      2: { icon: CheckCircle, className: 'bg-green-100 text-green-700' },   // Hoàn thành / Completed
+      0: { icon: Clock, className: 'bg-yellow-100 text-yellow-700' }, // Chờ xử lý / Pending
+      1: { icon: Wrench, className: 'bg-blue-100 text-blue-700' }, // Đang xử lý / In Progress
+      2: { icon: CheckCircle, className: 'bg-green-100 text-green-700' }, // Hoàn thành / Completed
     };
     const config = configs[status as keyof typeof configs] || { icon: Clock, className: 'bg-gray-100 text-gray-700' };
     const Icon = config.icon;
     return (
-      <span className={`flex items-center gap-1 px-3 py-1 rounded-full text-sm ${config.className}`}>
+      <span className={`flex items-center gap-1 px-3 py-1 rounded-full text-sm font-medium ${config.className}`}>
         <Icon className="w-4 h-4" />
         {label || 'Chờ xử lý'}
       </span>
@@ -133,14 +125,14 @@ export default function MaintenanceRequests() {
 
   const getPriorityBadge = (priority: number, label: string) => {
     const configs = {
-      0: { className: 'bg-gray-100 text-gray-700' },       // Thấp
-      1: { className: 'bg-blue-100 text-blue-700' },       // Trung bình
-      2: { className: 'bg-orange-100 text-orange-700' },   // Cao
-      3: { className: 'bg-red-100 text-red-700' },         // Khẩn cấp
+      0: { className: 'bg-gray-100 text-gray-700' }, // Thấp
+      1: { className: 'bg-blue-100 text-blue-700' }, // Trung bình
+      2: { className: 'bg-orange-100 text-orange-700' }, // Cao
+      3: { className: 'bg-red-100 text-red-700' }, // Khẩn cấp
     };
     const config = configs[priority as keyof typeof configs] || { className: 'bg-gray-100 text-gray-700' };
     return (
-      <span className={`px-2 py-1 rounded text-xs ${config.className}`}>
+      <span className={`px-2 py-1 rounded text-xs font-semibold ${config.className}`}>
         {label || 'Bình thường'}
       </span>
     );
@@ -201,7 +193,7 @@ export default function MaintenanceRequests() {
 
       {/* Danh sách yêu cầu hiển thị dạng thẻ */}
       <div className="space-y-4">
-        {loading ? (
+        {isLoading ? (
           <div className="p-10 text-center text-gray-500">Đang đồng bộ dữ liệu sửa chữa...</div>
         ) : filteredRequests.length === 0 ? (
           <div className="p-10 text-center text-gray-500 bg-white rounded-lg border border-gray-200">

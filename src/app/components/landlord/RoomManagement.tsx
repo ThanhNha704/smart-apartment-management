@@ -2,10 +2,7 @@ import { useState, useEffect } from 'react';
 import { Plus, Search, Edit, Trash2, Users, DoorOpen, Loader2 } from 'lucide-react';
 import * as Dialog from '@radix-ui/react-dialog';
 import { toast } from 'sonner';
-import axios from 'axios';
-
-// Khai báo Base URL của API Backend
-export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
+import { fetchApi } from '../../utils/api'; 
 
 // Định nghĩa Enum trạng thái phòng theo chuẩn Swagger Backend
 const RoomStatus = {
@@ -16,7 +13,7 @@ const RoomStatus = {
 
 type RoomStatus = typeof RoomStatus[keyof typeof RoomStatus];
 
-// Interface chuẩn theo Schema mẫu của API /api/Rooms
+// Interface chuẩn theo đúng Schema mẫu của API /api/Rooms từ Swagger
 interface Room {
   id: string;
   createdAt?: string;
@@ -25,10 +22,11 @@ interface Room {
   price: number;
   area: number;
   maxOccupants: number;
-  description: string;
+  description?: string;
   roomDeposit: number;
-  floorNumber: string;
+  floorNumber: number; // Đã sửa từ string thành number theo chuẩn GET Swagger
   status: RoomStatus;
+  statusName?: string; // Bổ sung trường từ Swagger mẫu
   tenantName?: string | null;
 }
 
@@ -67,13 +65,13 @@ export default function RoomManagement() {
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [roomToDelete, setRoomToDelete] = useState<string | null>(null);
 
-  // State quản lý Form phòng (Thêm / Sửa) -> Khớp với DTO /api/Rooms
+  // State quản lý Form phòng (Thêm / Sửa) -> Giữ nguyên để phục vụ giao diện cũ
   const [roomFormData, setRoomFormData] = useState({
     roomNumber: '',
     price: 0,
     area: 0,
     maxOccupants: 2,
-    roomDeposit: 0,
+    roomDeposit: 0, // Giữ lại ở giao diện để không lỗi hiển thị đầu vào
     floorId: '',
     description: ''
   });
@@ -88,22 +86,28 @@ export default function RoomManagement() {
     monthlyRent: 0
   });
 
-  // 1. Lấy tất cả dữ liệu cần thiết từ Backend
+  // --- 1. Hàm GET: Lấy tất cả dữ liệu cần thiết qua fetchApi ---
   const fetchData = async () => {
     try {
       setLoading(true);
 
       // Fetch danh sách phòng
-      const roomsRes = await axios.get<Room[]>(`${API_BASE_URL}/Rooms`);
-      setRooms(roomsRes.data);
+      const roomsRes = await fetchApi('/Rooms');
+      if (!roomsRes.ok) throw new Error('Không thể tải danh sách phòng');
+      const roomsData = await roomsRes.json();
+      setRooms(roomsData);
 
       // Fetch danh sách tầng để chọn
-      const floorsRes = await axios.get(`${API_BASE_URL}/Floors`);
-      setFloors(floorsRes.data.floors || []);
+      const floorsRes = await fetchApi('/Floors');
+      if (!floorsRes.ok) throw new Error('Không thể tải danh sách tầng');
+      const floorsData = await floorsRes.json();
+      setFloors(floorsData.floors || []);
 
       // Fetch danh sách người dùng (để chọn người thuê hợp lệ)
-      const usersRes = await axios.get<UserItem[]>(`${API_BASE_URL}/Users`);
-      setTenants(usersRes.data || []);
+      const usersRes = await fetchApi('/Users');
+      if (!usersRes.ok) throw new Error('Không thể tải danh sách khách hàng');
+      const usersData = await usersRes.json();
+      setTenants(usersData || []);
     } catch (error) {
       console.error("Lỗi lấy dữ liệu từ backend:", error);
       toast.error('Không thể kết nối đến hệ thống backend để tải dữ liệu!');
@@ -116,7 +120,7 @@ export default function RoomManagement() {
     fetchData();
   }, []);
 
-  // 2. Xử lý Thêm phòng mới (POST /api/Rooms)
+  // --- 2. Hàm POST: Xử lý Thêm phòng mới (/Rooms) ---
   const handleCreateRoom = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!roomFormData.floorId) {
@@ -124,18 +128,31 @@ export default function RoomManagement() {
       return;
     }
     try {
-      await axios.post(`${API_BASE_URL}/Rooms`, roomFormData);
-      toast.success('Đã thêm phòng mới lên hệ thống backend!');
-      setIsAddDialogOpen(false);
-      fetchData(); // Tải lại danh sách mới cập nhật từ DB
-    } catch (error: any) {
+      // Loại bỏ roomDeposit ra khỏi payload gửi lên vì schema POST của backend không có trường này
+      const { roomDeposit, ...postPayload } = roomFormData;
+
+      const response = await fetchApi('/Rooms', {
+        method: 'POST',
+        body: JSON.stringify(postPayload),
+      });
+
+      if (response.ok) {
+        toast.success('Đã thêm phòng mới lên hệ thống backend!');
+        setIsAddDialogOpen(false);
+        setRoomFormData({ roomNumber: '', price: 0, area: 0, maxOccupants: 2, roomDeposit: 0, floorId: '', description: '' });
+        fetchData();
+      } else {
+        const errorData = await response.json().catch(() => null);
+        const errMsg = errorData?.join?.(', ') || errorData?.message || 'Lỗi khi thêm phòng mới!';
+        toast.error(errMsg);
+      }
+    } catch (error) {
       console.error(error);
-      const errMsg = error.response?.data?.join?.(', ') || error.response?.data || 'Lỗi khi thêm phòng mới!';
-      toast.error(errMsg);
+      toast.error('Lỗi kết nối đến server!');
     }
   };
 
-  // 3. Xử lý Sửa thông tin phòng (PUT /api/Rooms/{id})
+  // --- 3. Hàm PUT: Xử lý Sửa thông tin phòng (/Rooms/{id}) ---
   const handleSaveEdit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedRoom) return;
@@ -145,21 +162,31 @@ export default function RoomManagement() {
     }
 
     try {
-      await axios.put(`${API_BASE_URL}/Rooms/${selectedRoom.id}`, {
-        ...roomFormData
+      // Loại bỏ roomDeposit ra khỏi payload gửi lên vì schema PUT của backend không có trường này
+      const { roomDeposit, ...putPayload } = roomFormData;
+
+      const response = await fetchApi(`/Rooms/${selectedRoom.id}`, {
+        method: 'PUT',
+        body: JSON.stringify(putPayload),
       });
-      toast.success('Đã cập nhật thông tin phòng thành công!');
-      setIsEditDialogOpen(false);
-      setSelectedRoom(null);
-      fetchData();
-    } catch (error: any) {
+
+      if (response.ok) {
+        toast.success('Đã cập nhật thông tin phòng thành công!');
+        setIsEditDialogOpen(false);
+        setSelectedRoom(null);
+        fetchData();
+      } else {
+        const errorData = await response.json().catch(() => null);
+        const errMsg = errorData?.join?.(', ') || errorData?.message || 'Cập nhật thông tin thất bại!';
+        toast.error(errMsg);
+      }
+    } catch (error) {
       console.error(error);
-      const errMsg = error.response?.data?.join?.(', ') || error.response?.data || 'Cập nhật thông tin thất bại!';
-      toast.error(errMsg);
+      toast.error('Lỗi kết nối đến server!');
     }
   };
 
-  // 4. Xử lý Lập hợp đồng & Cho thuê phòng (POST /api/Contracts)
+  // --- 4. Hàm POST: Xử lý Lập hợp đồng & Cho thuê phòng (/Contracts) ---
   const handleSaveRent = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedRoom) return;
@@ -169,65 +196,78 @@ export default function RoomManagement() {
     }
 
     try {
-      // Gọi API tạo hợp đồng thuê phòng
-      await axios.post(`${API_BASE_URL}/Contracts`, {
-        roomNumber: selectedRoom.roomNumber, // Truyền roomNumber liên kết
-        contractNumber: contractFormData.contractNumber,
-        tenantName: contractFormData.tenantName,
-        startDate: contractFormData.startDate,
-        endDate: contractFormData.endDate,
-        paymentDate: contractFormData.paymentDate,
-        monthlyRent: contractFormData.monthlyRent
+      const response = await fetchApi('/Contracts', {
+        method: 'POST',
+        body: JSON.stringify({
+          roomNumber: selectedRoom.roomNumber,
+          contractNumber: contractFormData.contractNumber,
+          tenantName: contractFormData.tenantName,
+          startDate: contractFormData.startDate,
+          endDate: contractFormData.endDate,
+          paymentDate: contractFormData.paymentDate,
+          monthlyRent: contractFormData.monthlyRent
+        }),
       });
 
-      toast.success(`Đã kích hoạt hợp đồng ${contractFormData.contractNumber} thành công!`);
-      setIsRentDialogOpen(false);
-      setSelectedRoom(null);
-      fetchData(); // Tải lại để cập nhật trạng thái phòng thành Đã thuê (1) và hiển thị TenantName
-    } catch (error: any) {
+      if (response.ok) {
+        toast.success(`Đã kích hoạt hợp đồng ${contractFormData.contractNumber} thành công!`);
+        setIsRentDialogOpen(false);
+        setSelectedRoom(null);
+        fetchData();
+      } else {
+        const errorData = await response.json().catch(() => null);
+        const errMsg = errorData?.join?.(', ') || errorData?.message || 'Không thể tạo hợp đồng cho thuê!';
+        toast.error(errMsg);
+      }
+    } catch (error) {
       console.error(error);
-      const errMsg = error.response?.data?.join?.(', ') || error.response?.data || 'Không thể tạo hợp đồng cho thuê!';
-      toast.error(errMsg);
+      toast.error('Lỗi kết nối đến server!');
     }
   };
 
-  // 5. Xử lý Xóa phòng (DELETE /api/Rooms/{id})
+  // --- 5. Hàm DELETE: Xóa phòng ---
   const confirmDeleteRoom = async () => {
     if (!roomToDelete) return;
     try {
-      await axios.delete(`${API_BASE_URL}/Users/${roomToDelete}`);
-      toast.success('Đã xóa phòng thành công!');
-      setIsDeleteDialogOpen(false);
-      setRoomToDelete(null);
-      fetchData(); // Hoặc fetchData() tùy theo hàm làm mới dữ liệu của bạn
+      const response = await fetchApi(`/Rooms/${roomToDelete}`, {
+        method: 'DELETE',
+      });
+
+      if (response.ok) {
+        toast.success('Đã xóa phòng thành công!');
+        setIsDeleteDialogOpen(false);
+        setRoomToDelete(null);
+        fetchData();
+      } else {
+        throw new Error('Xóa thất bại');
+      }
     } catch (error) {
       console.error(error);
       toast.error('Không thể xóa phòng này (Có thể liên quan đến ràng buộc dữ liệu hợp đồng).');
     }
   };
 
-  // Hàm này gắn vào sự kiện onClick của nút "Xóa" dưới danh sách/bảng
   const openDeleteModal = (id: string) => {
     setRoomToDelete(id);
     setIsDeleteDialogOpen(true);
   };
 
-  // Mở form Sửa thông tin phòng và gán dữ liệu cũ vào state
   const openEditModal = (room: Room) => {
     setSelectedRoom(room);
+    // Khớp floorNumber kiểu số của phòng với floorNumber của danh sách Tầng để tìm floorId chuẩn xác
+    const matchedFloor = floors.find(f => f.floorNumber === room.floorNumber);
     setRoomFormData({
       roomNumber: room.roomNumber,
       price: room.price,
       area: room.area,
       maxOccupants: room.maxOccupants,
       roomDeposit: room.roomDeposit,
-      floorId: room.floorNumber,
+      floorId: matchedFloor?.id || '',
       description: room.description || ''
     });
     setIsEditDialogOpen(true);
   };
 
-  // Mở form Lập hợp đồng cho thuê phòng trống
   const openRentModal = (room: Room) => {
     setSelectedRoom(room);
     setContractFormData({
@@ -241,7 +281,6 @@ export default function RoomManagement() {
     setIsRentDialogOpen(true);
   };
 
-  // Logic Tìm kiếm và Lọc trên dữ liệu động lấy về từ Backend
   const filteredRooms = rooms.filter(room => {
     const matchesSearch = room.roomNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
       (room.tenantName && room.tenantName.toLowerCase().includes(searchTerm.toLowerCase()));
@@ -266,6 +305,15 @@ export default function RoomManagement() {
       </span>
     );
   };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center p-12 text-gray-500">
+        <Loader2 className="w-6 h-6 mr-2 animate-spin" />
+        Đang tải dữ liệu phòng từ hệ thống...
+      </div>
+    );
+  }
 
   return (
     <div className="p-6 max-w-7xl mx-auto">
@@ -333,7 +381,7 @@ export default function RoomManagement() {
                 <div>
                   <h3 className="text-xl font-semibold mb-1">{room.roomNumber}</h3>
                   <p className="text-gray-400 text-xs">
-                    Mã tầng: {floors.find(f => f.id === room.floorNumber)?.name || `Tầng (ID: ${room.floorNumber})`}
+                    Mã tầng: {floors.find(f => f.floorNumber === room.floorNumber)?.name || `Tầng ${room.floorNumber}`}
                   </p>
                 </div>
                 {getStatusBadge(room.status)}
@@ -395,7 +443,7 @@ export default function RoomManagement() {
       <Dialog.Root open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
         <Dialog.Portal>
           <Dialog.Overlay className="fixed inset-0 bg-black/50 animate-fade-in" />
-          <Dialog.Content className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-white rounded-lg p-6 w-full max-w-md shadow-xl border border-gray-200">
+          <Dialog.Content aria-describedby={undefined} className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-white rounded-lg p-6 w-full max-w-md shadow-xl border border-gray-200">
             <Dialog.Title className="text-xl font-semibold mb-4">Thêm phòng mới</Dialog.Title>
             <form className="space-y-4" onSubmit={handleCreateRoom}>
               <div>
@@ -453,7 +501,7 @@ export default function RoomManagement() {
       <Dialog.Root open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
         <Dialog.Portal>
           <Dialog.Overlay className="fixed inset-0 bg-black/50 animate-fade-in" />
-          <Dialog.Content className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-white rounded-lg p-6 w-full max-w-md shadow-xl border border-gray-200">
+          <Dialog.Content aria-describedby={undefined} className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-white rounded-lg p-6 w-full max-w-md shadow-xl border border-gray-200">
             <Dialog.Title className="text-xl font-semibold mb-4">Sửa thông tin phòng</Dialog.Title>
             <form className="space-y-4" onSubmit={handleSaveEdit}>
               <div>
@@ -511,7 +559,7 @@ export default function RoomManagement() {
       <Dialog.Root open={isRentDialogOpen} onOpenChange={setIsRentDialogOpen}>
         <Dialog.Portal>
           <Dialog.Overlay className="fixed inset-0 bg-black/50 animate-fade-in" />
-          <Dialog.Content className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-white rounded-lg p-6 w-full max-w-md shadow-xl border border-gray-200 max-h-[90vh] overflow-auto">
+          <Dialog.Content aria-describedby={undefined} className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-white rounded-lg p-6 w-full max-w-md shadow-xl border border-gray-200 max-h-[90vh] overflow-auto">
             <Dialog.Title className="text-xl font-semibold mb-2">
               Lập hợp đồng thuê phòng {selectedRoom?.roomNumber}
             </Dialog.Title>
@@ -580,32 +628,32 @@ export default function RoomManagement() {
       </Dialog.Root>
 
       {/* Dialog Xác nhận xóa tài khoản */}
-            <Dialog.Root open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
-              <Dialog.Portal>
-                <Dialog.Overlay className="fixed inset-0 bg-black/50 animate-fade-in" />
-                <Dialog.Content className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-white rounded-lg p-6 w-full max-w-sm shadow-xl border border-gray-200">
-                  <Dialog.Title className="text-lg font-semibold text-gray-900 mb-2">
-                    Xác nhận xóa phòng
-                  </Dialog.Title>
-      
-                  <p className="text-sm text-gray-500 mb-5">
-                    Bạn có chắc chắn muốn xóa tài khoản phòng này khỏi cơ sở dữ liệu? Hành động này không thể hoàn tác.
-                  </p>
-      
-                  <div className="flex gap-2">
-                    <Dialog.Close className="flex-1 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 text-sm font-medium transition-colors">
-                      Hủy
-                    </Dialog.Close>
-                    <button
-                      onClick={confirmDeleteRoom}
-                      className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 text-sm font-medium transition-colors"
-                    >
-                      Xác nhận xóa
-                    </button>
-                  </div>
-                </Dialog.Content>
-              </Dialog.Portal>
-            </Dialog.Root>
+      <Dialog.Root open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+        <Dialog.Portal>
+          <Dialog.Overlay className="fixed inset-0 bg-black/50 animate-fade-in" />
+          <Dialog.Content aria-describedby={undefined} className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-white rounded-lg p-6 w-full max-w-sm shadow-xl border border-gray-200">
+            <Dialog.Title className="text-lg font-semibold text-gray-900 mb-2">
+              Xác nhận xóa phòng
+            </Dialog.Title>
+
+            <p className="text-sm text-gray-500 mb-5">
+              Bạn có chắc chắn muốn xóa tài khoản phòng này khỏi cơ sở dữ liệu? Hành động này không thể hoàn tác.
+            </p>
+
+            <div className="flex gap-2">
+              <Dialog.Close className="flex-1 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 text-sm font-medium transition-colors">
+                Hủy
+              </Dialog.Close>
+              <button
+                onClick={confirmDeleteRoom}
+                className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 text-sm font-medium transition-colors"
+              >
+                Xác nhận xóa
+              </button>
+            </div>
+          </Dialog.Content>
+        </Dialog.Portal>
+      </Dialog.Root>
     </div>
   );
 }

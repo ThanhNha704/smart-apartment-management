@@ -2,9 +2,7 @@ import { useState, useEffect } from 'react';
 import { Plus, Edit, Trash2, Building2, DoorOpen, Users } from 'lucide-react';
 import * as Dialog from '@radix-ui/react-dialog';
 import { toast } from 'sonner';
-import axios from 'axios';
-
-export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
+import { fetchApi } from '../../utils/api';
 
 // Định nghĩa Interface
 interface FloorItem {
@@ -41,12 +39,14 @@ export default function FloorManagement() {
   const [addFormData, setAddFormData] = useState({ floorNumber: '', roomCount: 0 });
   const [editFormData, setEditFormData] = useState({ floorNumber: '', roomCount: 0 });
 
-  // Hàm GET: Lấy danh sách tầng từ backend
+  // --- 1. Hàm GET: Lấy danh sách tầng sử dụng fetchApi chung ---
   const fetchFloors = async () => {
     try {
       setIsLoading(true);
-      const response = await fetch(`${API_BASE_URL}/Floors`);
+      // Sử dụng fetchApi chung, không cần truyền domain hay header Authorization nữa
+      const response = await fetchApi('/Floors');
       if (!response.ok) throw new Error('Không thể tải dữ liệu');
+      
       const data: ApiResponse = await response.json();
       setApiData(data);
     } catch (error) {
@@ -67,7 +67,7 @@ export default function FloorManagement() {
     return Math.round((floor.occupiedRooms / floor.roomCount) * 100);
   };
 
-  // Hàm POST: Thêm tầng mới
+  // --- 2. Hàm POST: Thêm tầng mới sử dụng fetchApi chung ---
   const handleAddFloor = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
@@ -79,9 +79,9 @@ export default function FloorManagement() {
         description: ''
       };
 
-      const response = await fetch(`${API_BASE_URL}/Floors`, {
+      // Gọi qua fetchApi chung
+      const response = await fetchApi('/Floors', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       });
 
@@ -110,7 +110,7 @@ export default function FloorManagement() {
     setIsEditDialogOpen(true);
   };
 
-  // Hàm PUT: Cập nhật thông tin tầng
+  // --- 3. Hàm PUT: Cập nhật thông tin tầng sử dụng fetchApi chung ---
   const handleSaveEdit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedFloor) return;
@@ -124,10 +124,10 @@ export default function FloorManagement() {
         description: selectedFloor.description || ''
       };
 
-      const response = await fetch(`${API_BASE_URL}/Floors/${selectedFloor.id}`, {
+      // Gọi qua fetchApi chung
+      const response = await fetchApi(`/Floors/${selectedFloor.id}`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload), // Gửi chuân request body
+        body: JSON.stringify(payload),
       });
 
       if (response.ok) {
@@ -145,26 +145,33 @@ export default function FloorManagement() {
     }
   };
 
-  // Hàm DELETE: Xóa tầng
+  // --- 4. Hàm DELETE: Thay thế axios bằng fetchApi chung ---
   const confirmDeleteFloor = async () => {
     if (!floorToDelete) return;
     try {
-      await axios.delete(`${API_BASE_URL}/Floors/${floorToDelete}`);
-      toast.success('Đã xóa tầng thành công!');
-      setIsDeleteDialogOpen(false);
-      setFloorToDelete(null);
-      fetchFloors(); // Hoặc fetchData() tùy theo hàm làm mới dữ liệu của bạn
+      const response = await fetchApi(`/Floors/${floorToDelete}`, {
+        method: 'DELETE',
+      });
+
+      if (response.ok) {
+        toast.success('Đã xóa tầng thành công!');
+        setIsDeleteDialogOpen(false);
+        setFloorToDelete(null);
+        fetchFloors();
+      } else {
+        throw new Error('Xóa thất bại');
+      }
     } catch (error) {
       console.error(error);
       toast.error('Không thể xóa tầng này (Có thể liên quan đến ràng buộc dữ liệu hợp đồng).');
     }
   };
 
-  // Hàm này gắn vào sự kiện onClick của nút "Xóa" dưới danh sách/bảng
   const openDeleteModal = (id: string) => {
     setFloorToDelete(id);
     setIsDeleteDialogOpen(true);
   };
+
   if (isLoading) {
     return <div className="p-6 text-center text-gray-500">Đang tải dữ liệu từ server...</div>;
   }

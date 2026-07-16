@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react';
-import { Camera, Upload, Calendar, CheckCircle } from 'lucide-react';
+import { Camera, Upload, Calendar, CheckCircle, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
+import { fetchApi } from '../../utils/api'; 
 
-export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
-
+// --- INTERFACES DỮ LIỆU CHUẨN SWAGGER ---
 interface Room {
   id: string;
   roomNumber: string;
@@ -14,11 +14,14 @@ interface MeterReadingItem {
   id: string;
   roomNumber: string;
   tenantName: string;
-  typeLabel: string; // 0: điện, 1: nước
+  type: string;
+  typeLabel: string; 
   month: number;
   year: number;
+  period: string; 
   previousIndex: number;
   currentIndex: number;
+  usage: number;
   usageLabel: string;
   unitPrice: number;
   total: number;
@@ -32,89 +35,93 @@ export default function MeterReading() {
 
   const [selectedRoomNumber, setSelectedRoomNumber] = useState('');
   const [currentIndex, setCurrentIndex] = useState('');
-  const [meterType, setMeterType] = useState<'0' | '1'>('0'); // Giả định: 0 = Điện, 1 = Nước
+  const [meterType, setMeterType] = useState<string>('Điện'); // Đồng bộ string theo Swagger
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isScanning, setIsScanning] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // 1. Tải danh sách phòng và lịch sử ghi số từ API khi load trang
-  useEffect(() => {
-    fetchRooms();
-    fetchReadings();
-  }, []);
-
-  const fetchRooms = async () => {
+  // Hàm GET: Tải danh sách phòng và lịch sử ghi số từ hệ thống
+  const fetchData = async () => {
     try {
       setIsLoading(true);
-      const response = await fetch(`${API_BASE_URL}/Rooms`);
-      if (!response.ok) throw new Error('Không thể tải dữ liệu');
-      const data: Room[] = await response.json();
-      setRooms(data);
+      
+      // Nếu có chọn phòng cụ thể, gọi endpoint lọc theo roomNumber của Swagger
+      const readingsUrl = selectedRoomNumber 
+        ? `/MeterReadings/room/${selectedRoomNumber}`
+        : '/MeterReadings';
+
+      const [roomsRes, readingsRes] = await Promise.all([
+        fetchApi('/Rooms'),
+        fetchApi(readingsUrl),
+      ]);
+
+      if (roomsRes.ok) {
+        const roomsData = await roomsRes.json();
+        setRooms(roomsData);
+      } else throw new Error('Không thể tải danh sách phòng');
+
+      if (readingsRes.ok) {
+        const readingsData = await readingsRes.json();
+        setReadings(readingsData);
+      } else throw new Error('Không thể tải lịch sử ghi số');
+
     } catch (error) {
-      toast.error('Lỗi khi lấy danh sách phòng từ server!');
-      console.error(error);
+      console.error("Lỗi lấy dữ liệu từ backend:", error);
+      toast.error('Lỗi khi tải dữ liệu từ máy chủ!');
     } finally {
       setIsLoading(false);
     }
   };
 
-  const fetchReadings = async () => {
-    try {
-      setIsLoading(true);
-      const response = await fetch(`${API_BASE_URL}/MeterReadings`);
-      if (!response.ok) throw new Error('Không thể tải dữ liệu');
-      const data: MeterReadingItem[] = await response.json();
-      setReadings(data);
-    } catch (error) {
-      toast.error('Lỗi khi tải lịch sử ghi số từ server!');
-      console.error('Lỗi tải lịch sử ghi số:', error);
-    }
-  };
+  // Tự động tải lại lịch sử khi người dùng thay đổi phòng chọn lọc
+  useEffect(() => {
+    fetchData();
+  }, [selectedRoomNumber]);
 
-  // 2. Xử lý khi người dùng chọn file ảnh (OCR thực tế qua API nhận diện)
+  // Hàm POST: Xử lý khi người dùng chọn file ảnh gửi dạng Multipart (OCR)
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
     if (!selectedRoomNumber) {
       toast.error('Vui lòng chọn phòng trước khi tải ảnh!');
+      e.target.value = '';
       return;
     }
 
     setSelectedFile(file);
     setIsScanning(true);
 
-    // Chuẩn bị FormData để gửi lên API POST /api/MeterReadings xử lý OCR
     const formData = new FormData();
     formData.append('RoomNumber', selectedRoomNumber);
-    formData.append('MeterIndex', '0'); // Giá trị tạm thời, backend OCR sẽ ghi đè hoặc phân tích
+    formData.append('MeterIndex', '0'); 
     formData.append('Type', meterType);
     formData.append('Photo', file);
 
     try {
-      const res = await fetch('/api/MeterReadings', {
+      const res = await fetchApi('/MeterReadings', {
         method: 'POST',
-        body: formData,
+        body: formData, 
       });
 
       if (res.ok) {
         const result = await res.json();
-        // Cập nhật số công tơ lấy về từ phản hồi nhận diện của backend
         setCurrentIndex(result.currentIndex?.toString() || '');
         toast.success('Đã quét ảnh và nhận diện số công tơ thành công!');
-        fetchReadings(); // Tải lại lịch sử
+        fetchData(); 
       } else {
-        const errText = await res.text();
-        toast.error(`Quét ảnh thất bại: ${errText || 'Lỗi hệ thống'}`);
+        const errorData = await res.json().catch(() => null);
+        toast.error(errorData?.message || 'Quét ảnh thất bại hoặc lỗi định dạng!');
       }
     } catch (error) {
+      console.error(error);
       toast.error('Không thể kết nối tới máy chủ OCR');
     } finally {
       setIsScanning(false);
     }
   };
 
-  // 3. Xử lý lưu/Xác nhận số công tơ nhập thủ công (hoặc khi chỉnh sửa lại số OCR)
+  // --- 3. Hàm POST: Xác nhận/Lưu thủ công chỉ số công tơ ---
   const handleSubmitReading = async () => {
     if (!selectedRoomNumber || !currentIndex) {
       toast.error('Vui lòng chọn phòng và nhập số công tơ!');
@@ -131,7 +138,7 @@ export default function MeterReading() {
     }
 
     try {
-      const res = await fetch('/api/MeterReadings', {
+      const res = await fetchApi('/MeterReadings', {
         method: 'POST',
         body: formData,
       });
@@ -141,11 +148,13 @@ export default function MeterReading() {
         setSelectedRoomNumber('');
         setCurrentIndex('');
         setSelectedFile(null);
-        fetchReadings(); // Reload lịch sử hiển thị
+        fetchData(); 
       } else {
-        toast.error('Ghi số công tơ thất bại. Vui lòng kiểm tra lại dữ liệu.');
+        const errorData = await res.json().catch(() => null);
+        toast.error(errorData?.message || 'Ghi số công tơ thất bại. Vui lòng kiểm tra lại!');
       }
     } catch (error) {
+      console.error(error);
       toast.error('Lỗi kết nối máy chủ');
     } finally {
       setIsSubmitting(false);
@@ -174,8 +183,8 @@ export default function MeterReading() {
                     <input
                       type="radio"
                       name="meterType"
-                      checked={meterType === '0'}
-                      onChange={() => setMeterType('0')}
+                      checked={meterType === 'Điện'}
+                      onChange={() => setMeterType('Điện')}
                       className="text-blue-600 focus:ring-blue-500"
                     />
                     Công tơ Điện
@@ -184,8 +193,8 @@ export default function MeterReading() {
                     <input
                       type="radio"
                       name="meterType"
-                      checked={meterType === '1'}
-                      onChange={() => setMeterType('1')}
+                      checked={meterType === 'Nước'}
+                      onChange={() => setMeterType('Nước')}
                       className="text-blue-600 focus:ring-blue-500"
                     />
                     Công tơ Nước
@@ -201,7 +210,7 @@ export default function MeterReading() {
                   onChange={(e) => setSelectedRoomNumber(e.target.value)}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                 >
-                  <option value="">-- Chọn phòng --</option>
+                  <option value="">-- Tất cả các phòng --</option>
                   {rooms.map((room) => (
                     <option key={room.id} value={room.roomNumber}>
                       {room.roomNumber} - {room.tenantName || 'Chưa có khách'}
@@ -256,7 +265,7 @@ export default function MeterReading() {
 
           <button
             onClick={handleSubmitReading}
-            disabled={isSubmitting || isScanning}
+            disabled={isSubmitting || isScanning || isLoading}
             className="w-full mt-6 px-4 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:bg-gray-400 flex items-center justify-center gap-2 font-medium transition-colors"
           >
             <CheckCircle className="w-5 h-5" />
@@ -266,9 +275,16 @@ export default function MeterReading() {
 
         {/* LỊCH SỬ GHI SỐ THỰC TẾ TỪ API */}
         <div className="bg-white rounded-lg border border-gray-200 p-6 overflow-y-auto max-h-[600px]">
-          <h3 className="font-semibold mb-4 text-gray-800">Lịch sử ghi số gần đây</h3>
+          <h3 className="font-semibold mb-4 text-gray-800">
+            {selectedRoomNumber ? `Lịch sử ghi số phòng ${selectedRoomNumber}` : 'Lịch sử ghi số gần đây'}
+          </h3>
           <div className="space-y-3">
-            {readings.length === 0 ? (
+            {isLoading ? (
+              <div className="flex flex-col items-center justify-center py-12 gap-2 text-gray-500">
+                <Loader2 className="w-6 h-6 animate-spin text-blue-600" />
+                <p className="text-xs">Đang đồng bộ lịch sử chỉ số...</p>
+              </div>
+            ) : readings.length === 0 ? (
               <p className="text-sm text-gray-500 text-center py-8">Chưa có dữ liệu ghi nhận chỉ số.</p>
             ) : (
               readings.map((reading) => (
@@ -280,10 +296,10 @@ export default function MeterReading() {
                       </p>
                       <div className="flex items-center gap-3 text-xs text-gray-500 mt-0.5">
                         <span className="flex items-center gap-1">
-                          <Calendar className="w-3 h-3" /> Thánɡ {reading.month}/{reading.year}
+                          <Calendar className="w-3 h-3" /> Tháng {reading.month}/{reading.year}
                         </span>
                         <span className="px-2 py-0.5 bg-gray-100 text-gray-700 rounded-full font-medium">
-                          {reading.typeLabel}
+                          {reading.typeLabel || reading.type}
                         </span>
                       </div>
                     </div>
@@ -299,7 +315,9 @@ export default function MeterReading() {
                     </div>
                     <div>
                       <p className="text-gray-500 text-xs">Tiêu thụ</p>
-                      <p className="font-semibold text-blue-600">{reading.usageLabel}</p>
+                      <p className="font-semibold text-blue-600">
+                        {reading.usageLabel || `${reading.usage} ${reading.type === 'Điện' ? 'kWh' : 'm³'}`}
+                      </p>
                     </div>
                   </div>
                   <div className="mt-2 pt-2 border-t border-gray-100 flex justify-between items-center">
