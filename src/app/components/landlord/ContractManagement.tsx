@@ -4,7 +4,7 @@ import * as Dialog from '@radix-ui/react-dialog';
 import { toast } from 'sonner';
 import { fetchApi } from '../../utils/api';
 
-// INTERFACES DỮ LIỆU
+// INTERFACES DỮ LIỆU CHUẨN BACKEND (Khớp 100% với Swagger)
 interface ContractBackend {
   id: string;
   createdAt: string;
@@ -30,7 +30,7 @@ interface CreateContractInput {
   startDate: string;
   endDate: string;
   paymentDate: number;
-  monthlyRent: number;
+  monthlyRent: number; // Đảm bảo khớp với request body của POST /api/Contracts
 }
 
 interface RoomOption { id: string; roomNumber: string; price: number; status: number; }
@@ -119,22 +119,23 @@ export default function ContractManagement() {
     }
   }, [selectedTenantId, tenants, isCreateDialogOpen]);
 
-  // POST: Tạo hợp đồng mới
+  // POST: Tạo hợp đồng mới (Sửa payload map chính xác sang "monthlyRent" theo Swagger)
   const handleCreateContract = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      const payload = {
+      const payload: CreateContractInput = {
         contractNumber: createFormData.contractNumber,
         roomNumber: createFormData.roomNumber,
         tenantName: createFormData.tenantName,
         startDate: createFormData.startDate ? new Date(createFormData.startDate).toISOString() : '',
         endDate: createFormData.endDate ? new Date(createFormData.endDate).toISOString() : '',
         paymentDate: createFormData.paymentDate,
-        price: createFormData.monthlyRent,
+        monthlyRent: createFormData.monthlyRent, // Khớp chuẩn 100% Swagger
       };
 
       const response = await fetchApi('/Contracts', {
         method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       });
 
@@ -154,7 +155,7 @@ export default function ContractManagement() {
     }
   };
 
-  // PUT: Thanh lý hợp đồng theo cấu trúc Swagger
+  // PUT: Thanh lý hợp đồng
   const handleTerminateContract = async () => {
     if (!contractToTerminate) return;
     try {
@@ -316,7 +317,7 @@ export default function ContractManagement() {
                   {renderStatusBadge(selectedContract.statusLabel, selectedContract.status)}
                 </Dialog.Title>
                 <div className="space-y-5">
-                  <div className="grid grid-cols-2 gap-4 bg-gray-50 p-4 rounded-lg border border-gray-400">
+                  <div className="grid grid-cols-2 gap-4 bg-gray-50 p-4 rounded-lg border border-gray-300">
                     <div><p className="text-xs text-gray-400">Khách thuê phòng</p><p className="font-semibold text-base text-gray-900">{selectedContract.tenantName}</p></div>
                     <div><p className="text-xs text-gray-400">Số phòng liên kết</p><p className="font-semibold text-base text-gray-900">Phòng {selectedContract.roomNumber}</p></div>
                   </div>

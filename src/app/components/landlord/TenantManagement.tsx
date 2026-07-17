@@ -4,31 +4,25 @@ import * as Dialog from '@radix-ui/react-dialog';
 import { toast } from 'sonner';
 import { fetchApi } from '../../utils/api';
 
-// Interface
+// Interface chuẩn hóa theo đúng dữ liệu trả về của API GET /api/Users công bố trên Swagger
 interface UserTenant {
   id: string;
-  createdAt: string;
-  updatedAt: string;
   name: string;
-  password?: string;
   email: string;
   phoneNumber: string;
   idCard: string;
   avatarUrl: string | null;
   address: string;
   dateOfBirth: string;
-  roomId: string | null;
   roomNumber: string | null;
-  refreshToken?: string | null;
-  refreshTokenExpiry?: string | null;
-  fcmToken?: string | null;
   isActive: boolean;
+  role: string;
 }
 
-// Cấu trúc Form
+// Cấu trúc Form chuẩn hóa 100% theo Request Body của POST và PUT trong Swagger
 const blankTenantFormData = {
   name: '',
-  password: '',
+  password: '', // Chỉ dùng cho POST/PUT để khởi tạo/thay đổi mật khẩu
   email: '',
   phoneNumber: '',
   idCard: '',
@@ -81,9 +75,14 @@ export default function TenantManagement() {
     }
 
     try {
+      const payload = {
+        ...formData,
+        dateOfBirth: new Date(formData.dateOfBirth).toISOString()
+      };
+
       const response = await fetchApi('/Users', {
         method: 'POST',
-        body: JSON.stringify(formData),
+        body: JSON.stringify(payload),
       });
 
       if (response.ok) {
@@ -105,7 +104,6 @@ export default function TenantManagement() {
   const openEditModal = (tenant: UserTenant) => {
     setSelectedTenantId(tenant.id);
 
-    // Định dạng chuỗi ngày sinh thích hợp để điền vào <input type="date" /> (YYYY-MM-DD)
     let formattedDate = '';
     if (tenant.dateOfBirth) {
       formattedDate = tenant.dateOfBirth.split('T')[0];
@@ -113,7 +111,7 @@ export default function TenantManagement() {
 
     setFormData({
       name: tenant.name,
-      password: '', // Để trống mật khẩu nếu không có nhu cầu đổi
+      password: '', // Password không được trả về ở GET nên để trống để điền nếu muốn đổi
       email: tenant.email,
       phoneNumber: tenant.phoneNumber,
       idCard: tenant.idCard || '',
@@ -129,9 +127,14 @@ export default function TenantManagement() {
     if (!selectedTenantId) return;
 
     try {
+      const payload = {
+        ...formData,
+        dateOfBirth: formData.dateOfBirth ? new Date(formData.dateOfBirth).toISOString() : ""
+      };
+
       const response = await fetchApi(`/Users/${selectedTenantId}`, {
         method: 'PUT',
-        body: JSON.stringify({ id: selectedTenantId, ...formData }),
+        body: JSON.stringify(payload), // Body gửi đi sạch sẽ chỉ chứa schema thay đổi
       });
 
       if (response.ok) {
@@ -177,24 +180,32 @@ export default function TenantManagement() {
     setIsDeleteDialogOpen(true);
   };
 
-  // Định dạng hiển thị ngày sinh ra UI Việt Nam (DD/MM/YYYY)
   const formatDateDisplay = (dateStr: string) => {
     if (!dateStr) return 'Chưa cập nhật';
+
     try {
       const date = new Date(dateStr);
-      return date.toLocaleDateString('vi-VN');
+      if (isNaN(date.getTime())) return dateStr; // Chuỗi không hợp lệ thì trả về nguyên bản
+
+      // Ép hiển thị theo cấu trúc ngày/tháng/năm bằng cách thủ công hoặc toLocaleDateString
+      const day = String(date.getDate()).padStart(2, '0');
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const year = date.getFullYear();
+
+      return `${day}/${month}/${year}`;
     } catch {
       return dateStr;
     }
   };
 
-  // Bộ lọc tìm kiếm dynamic
   const filteredTenants = tenants.filter(tenant =>
     tenant.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
     tenant.phoneNumber?.includes(searchTerm) ||
     tenant.idCard?.includes(searchTerm) ||
     tenant.email?.toLowerCase().includes(searchTerm.toLowerCase())
   );
+
+  // UI Code giữ nguyên ở dưới...
 
   return (
     <div className="p-6 max-w-7xl mx-auto">
@@ -444,7 +455,8 @@ export default function TenantManagement() {
                 <div>
                   <label className="block text-sm font-medium mb-1">Ngày sinh <span className="text-red-500">*</span></label>
                   <input
-                    type="date" required
+                    type="date" 
+                    required
                     value={formData.dateOfBirth}
                     onChange={(e) => setFormData({ ...formData, dateOfBirth: e.target.value })}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none"

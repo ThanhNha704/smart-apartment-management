@@ -4,12 +4,12 @@ import * as Dialog from '@radix-ui/react-dialog';
 import { toast } from 'sonner';
 import { fetchApi } from '../../utils/api';
 
-// Định nghĩa Interface
+// Định nghĩa Interface chuẩn xác theo Schema phản hồi của GET /api/Floors
 interface FloorItem {
   id: string;
   floorNumber: number;
   name: string;
-  description?: string;
+  description: string;
   roomCount: number;
   occupiedRooms: number;
   emptyRooms: number;
@@ -35,9 +35,9 @@ export default function FloorManagement() {
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [floorToDelete, setFloorToDelete] = useState<string | null>(null);
 
-  // States quản lý dữ liệu Form nhập vào
-  const [addFormData, setAddFormData] = useState({ floorNumber: '', roomCount: 0 });
-  const [editFormData, setEditFormData] = useState({ floorNumber: '', roomCount: 0 });
+  // States quản lý dữ liệu Form nhập vào (chỉ giữ lại các trường có trong Request Body của backend)
+  const [addFormData, setAddFormData] = useState({ floorNumber: '', name: '', description: '' });
+  const [editFormData, setEditFormData] = useState({ floorNumber: '', name: '', description: '' });
 
   // Hàm GET: Lấy danh sách tầng
   const fetchFloors = async () => {
@@ -66,19 +66,18 @@ export default function FloorManagement() {
     return Math.round((floor.occupiedRooms / floor.roomCount) * 100);
   };
 
-  // Hàm POST: Thêm tầng mới
+  // Hàm POST: Thêm tầng mới (Khớp Schema Request Body: name, floorNumber, description)
   const handleAddFloor = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
       const num = parseInt(addFormData.floorNumber.replace(/\D/g, '')) || 0;
-      const name = addFormData.floorNumber.includes('Tầng') ? addFormData.floorNumber : `Tầng ${addFormData.floorNumber}`;
+      
       const payload = {
+        name: addFormData.name || `Tầng ${num}`,
         floorNumber: num,
-        name: name,
-        description: ''
+        description: addFormData.description
       };
 
-      // Gọi qua fetchApi chung
       const response = await fetchApi('/Floors', {
         method: 'POST',
         body: JSON.stringify(payload),
@@ -87,7 +86,7 @@ export default function FloorManagement() {
       if (response.ok) {
         toast.success('Đã thêm tầng thành công!');
         setIsAddDialogOpen(false);
-        setAddFormData({ floorNumber: '', roomCount: 0 });
+        setAddFormData({ floorNumber: '', name: '', description: '' });
         fetchFloors();
       } else {
         const errorData = await response.json().catch(() => null);
@@ -104,26 +103,26 @@ export default function FloorManagement() {
     setSelectedFloor(floor);
     setEditFormData({
       floorNumber: floor.floorNumber.toString(),
-      roomCount: floor.roomCount,
+      name: floor.name,
+      description: floor.description || '',
     });
     setIsEditDialogOpen(true);
   };
 
-  // Hàm PUT: Cập nhật thông tin tầng
+  // Hàm PUT: Cập nhật thông tin tầng (Khớp Schema Request Body: name, floorNumber, description)
   const handleSaveEdit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedFloor) return;
 
     try {
       const num = parseInt(editFormData.floorNumber.replace(/\D/g, '')) || 0;
-      const name = editFormData.floorNumber.includes('Tầng') ? editFormData.floorNumber : `Tầng ${editFormData.floorNumber}`;
+      
       const payload = {
+        name: editFormData.name || `Tầng ${num}`,
         floorNumber: num,
-        name: name,
-        description: selectedFloor.description || ''
+        description: editFormData.description
       };
 
-      // Gọi qua fetchApi chung
       const response = await fetchApi(`/Floors/${selectedFloor.id}`, {
         method: 'PUT',
         body: JSON.stringify(payload),
@@ -216,14 +215,15 @@ export default function FloorManagement() {
 
           return (
             <div key={floor.id} className="bg-white rounded-lg border border-gray-200 p-6 hover:shadow-lg transition-shadow">
-              <div className="flex items-start justify-between mb-6">
+              <div className="flex items-start justify-between mb-4">
                 <div className="flex items-center gap-3">
                   <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
                     <Building2 className="w-6 h-6 text-blue-600" />
                   </div>
                   <div>
-                    <h3 className="text-xl font-semibold">{`Tầng ${floor.floorNumber}`}</h3>
-                    <p className="text-sm text-gray-600">{floor.roomCount} phòng</p>
+                    <h3 className="text-xl font-semibold">{floor.name}</h3>
+                    <p className="text-xs text-gray-400">Mã số số tầng: {floor.floorNumber}</p>
+                    {floor.description && <p className="text-sm text-gray-500 mt-1">{floor.description}</p>}
                   </div>
                 </div>
                 <div className="flex gap-2">
@@ -244,7 +244,7 @@ export default function FloorManagement() {
 
               <div className="mb-4">
                 <div className="flex justify-between text-sm mb-2">
-                  <span className="text-gray-600">Tỷ lệ lấp đầy</span>
+                  <span className="text-gray-600">Tỷ lệ lấp đầy ({floor.roomCount} phòng)</span>
                   <span className="font-medium">{occupancyRate}%</span>
                 </div>
                 <div className="w-full bg-gray-200 rounded-full h-2">
@@ -290,25 +290,33 @@ export default function FloorManagement() {
             <Dialog.Title className="text-xl font-semibold mb-4">Thêm tầng mới</Dialog.Title>
             <form className="space-y-4" onSubmit={handleAddFloor}>
               <div>
-                <label className="block text-sm font-medium mb-1">Tên/Số tầng</label>
+                <label className="block text-sm font-medium mb-1">Số tầng (Index)</label>
                 <input
                   type="text"
                   value={addFormData.floorNumber}
                   onChange={(e) => setAddFormData({ ...addFormData, floorNumber: e.target.value })}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  placeholder="Ví dụ: Tầng 5 hoặc 5"
+                  placeholder="Ví dụ: 5"
                   required
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium mb-1">Số lượng phòng</label>
+                <label className="block text-sm font-medium mb-1">Tên hiển thị tầng</label>
                 <input
-                  type="number"
-                  value={addFormData.roomCount || ''}
-                  disabled
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50"
-                  placeholder="0"
-                  required
+                  type="text"
+                  value={addFormData.name}
+                  onChange={(e) => setAddFormData({ ...addFormData, name: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="Ví dụ: Lầu 5 (Mặc định: Tầng + Số tầng)"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1">Mô tả chi tiết</label>
+                <textarea
+                  value={addFormData.description}
+                  onChange={(e) => setAddFormData({ ...addFormData, description: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 min-h-[80px]"
+                  placeholder="Thông tin thêm về khu vực tầng..."
                 />
               </div>
               <div className="flex gap-2 pt-4">
@@ -332,7 +340,7 @@ export default function FloorManagement() {
             <Dialog.Title className="text-xl font-semibold mb-4">Sửa thông tin tầng</Dialog.Title>
             <form className="space-y-4" onSubmit={handleSaveEdit}>
               <div>
-                <label className="block text-sm font-medium mb-1">Tên/Số tầng</label>
+                <label className="block text-sm font-medium mb-1">Số tầng (Index)</label>
                 <input
                   type="text"
                   value={editFormData.floorNumber}
@@ -342,19 +350,22 @@ export default function FloorManagement() {
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium mb-1">Số lượng phòng</label>
+                <label className="block text-sm font-medium mb-1">Tên hiển thị tầng</label>
                 <input
-                  type="number"
-                  value={editFormData.roomCount || ''}
-                  disabled
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50"
+                  type="text"
+                  value={editFormData.name}
+                  onChange={(e) => setEditFormData({ ...editFormData, name: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                   required
                 />
               </div>
-              <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
-                <p className="text-sm text-yellow-800">
-                  ⚠️ Lưu ý: Số lượng phòng được quản lý tự động theo số phòng thực tế của tầng
-                </p>
+              <div>
+                <label className="block text-sm font-medium mb-1">Mô tả chi tiết</label>
+                <textarea
+                  value={editFormData.description}
+                  onChange={(e) => setEditFormData({ ...editFormData, description: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 min-h-[80px]"
+                />
               </div>
               <div className="flex gap-2 pt-4">
                 <Dialog.Close type="button" className="flex-1 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50">
@@ -369,7 +380,7 @@ export default function FloorManagement() {
         </Dialog.Portal>
       </Dialog.Root>
 
-      {/* Dialog Xác nhận xóa tài khoản */}
+      {/* Dialog Xác nhận xóa */}
       <Dialog.Root open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
         <Dialog.Portal>
           <Dialog.Overlay className="fixed inset-0 bg-black/50 animate-fade-in" />

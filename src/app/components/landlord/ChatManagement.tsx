@@ -1,17 +1,19 @@
 import { useState, useEffect, useRef } from 'react';
-import { Search, Send, Image as ImageIcon, CheckCheck, Loader2, ArrowLeft, User } from 'lucide-react';
+import { Search, Send, Image as ImageIcon, Check, CheckCheck, Loader2, ArrowLeft, User, Download } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '../../contexts/AuthContext';
 import { fetchApi } from '../../utils/api';
 
 // INTERFACES
 interface Message {
-    id: string;
-    senderId: string;
-    receiverId: string;
-    content: string;
-    type: number; // 0: Text, 1: Image, ...
-    imageUrl?: string;
+    id?: string;
+    senderId?: string;
+    senderRole: 'Admin' | 'Tenant' | string;
+    receiverId?: string;
+    conversationId: string;
+    content: string | null;
+    type: 'Text' | 'Image' | string;
+    imageUrl?: string | null;
     isRead: boolean;
     createdAt: string;
 }
@@ -20,11 +22,13 @@ interface UserOption {
     id: string;
     name: string;
     avatarUrl?: string;
+    lastMessage?: Message | null;
+    unreadCount?: number;
 }
 
 export default function ChatManagement() {
     const { user } = useAuth();
-    const CURRENT_USER_ID = user?.id || ""; // Lấy ID động từ User đăng nhập thực tế
+    const CURRENT_USER_ID = user?.id || "";
 
     const [users, setUsers] = useState<UserOption[]>([]);
     const [activeUser, setActiveUser] = useState<UserOption | null>(null);
@@ -44,65 +48,130 @@ export default function ChatManagement() {
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
 
-    // Cuộn xuống đáy hòm thư khi có tin nhắn mới
-    const scrollToBottom = () => {
-        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    const scrollToBottom = (behavior: 'smooth' | 'auto' = 'smooth') => {
+        if (messagesEndRef.current) {
+            messagesEndRef.current.scrollIntoView({ behavior });
+        }
     };
 
     useEffect(() => {
-        scrollToBottom();
+        if (messages.length > 0) {
+            const timer = setTimeout(() => {
+                scrollToBottom('smooth');
+            }, 100);
+            return () => clearTimeout(timer);
+        }
     }, [messages]);
 
-    // Tải danh sách người dùng để tạo danh sách hội thoại
-    useEffect(() => {
-        const fetchUsers = async () => {
-            try {
-                setIsLoadingUsers(true);
-                const res = await fetchApi('/Users');
-                if (res.ok) {
-                    const data = await res.json();
-                    // Lọc bỏ tài khoản của chính mình khỏi danh sách chat nếu có trùng ID
-                    setUsers(data.filter((u: UserOption) => u.id !== CURRENT_USER_ID));
+    // Tải danh sách người dùng & kiểm tra tin nhắn cuối cùng
+    const fetchUsersAndChatStatus = async () => {
+        try {
+            setIsLoadingUsers(true);
+            const res = await fetchApi('/Users');
+            if (res.ok) {
+                const userData: UserOption[] = await res.json();
+                const filtered = userData.filter((u) => u.id !== CURRENT_USER_ID);
+
+                const enrichedUsers = await Promise.all(
+                    filtered.map(async (u) => {
+                        try {
+                            const msgRes = await fetchApi(`/Message/conversation/${u.id}?page=1&pageSize=1`);
+                            if (msgRes.ok) {
+                                const chatData = await msgRes.json();
+                                const history: Message[] = Array.isArray(chatData) ? chatData : (chatData?.items || []);
+
+                                if (history.length > 0) {
+                                    const lastMsg = history[0];
+                                    const isUnread = lastMsg.senderRole !== 'Admin' && !lastMsg.isRead;
+
+                                    return {
+                                        ...u,
+                                        lastMessage: lastMsg,
+                                        unreadCount: isUnread ? 1 : 0
+                                    };
+                                }
+                            }
+                        } catch (e) {
+                            console.error("Lỗi lấy trạng thái chat của user:", u.id, e);
+                        }
+                        return { ...u, lastMessage: null, unreadCount: 0 };
+                    })
+                );
+
+                setUsers(enrichedUsers);
+
+                // GIỮ TRẠNG THÁI CHAT KHI F5
+                const savedActiveUserId = localStorage.getItem('active_chat_user_id');
+                if (savedActiveUserId) {
+                    const foundUser = enrichedUsers.find(u => u.id === savedActiveUserId);
+                    if (foundUser) {
+                        setActiveUser(foundUser);
+                    }
                 }
-            } catch {
-                toast.error('Không thể tải danh sách người dùng!');
-            } finally {
-                setIsLoadingUsers(false);
             }
-        };
-        fetchUsers();
+        } catch {
+            toast.error('Không thể tải danh sách người dùng!');
+        } finally {
+            setIsLoadingUsers(false);
+        }
+    };
+
+    useEffect(() => {
+        fetchUsersAndChatStatus();
     }, []);
 
-    // Tải tin nhắn của hội thoại đang chọn
+    // Tải tin nhắn của hội thoại
     const fetchConversation = async (conversationId: string) => {
         try {
             setIsLoadingMessages(true);
             const res = await fetchApi(`/Message/conversation/${conversationId}?page=1&pageSize=50`);
             if (res.ok) {
+                clearImage();
+                setInputText('');
                 const chatHistory = await res.json();
-
+                let rawMessages: Message[] = [];
                 if (Array.isArray(chatHistory)) {
-                    setMessages(chatHistory);
+                    rawMessages = chatHistory;
                 } else if (chatHistory && Array.isArray(chatHistory.items)) {
-                    setMessages(chatHistory.items);
+                    rawMessages = chatHistory.items;
                 }
 
+                const sortedMessages = [...rawMessages].sort(
+                    (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+                );
+
+                setMessages(sortedMessages);
+
                 await fetchApi(`/Message/mark-all-read/${conversationId}`, { method: 'PUT' });
+
+                setUsers(prevUsers =>
+                    prevUsers.map(u => u.id === conversationId ? { ...u, unreadCount: 0, lastMessage: u.lastMessage ? { ...u.lastMessage, isRead: true } : null } : u)
+                );
             }
         } catch {
             toast.error('Lỗi khi tải lịch sử nhắn tin!');
         } finally {
             setIsLoadingMessages(false);
+            setTimeout(() => scrollToBottom('auto'), 50);
         }
     };
 
     useEffect(() => {
         if (activeUser) {
+            // GIỮ TRẠNG THÁI CHAT KHI F5
+            localStorage.setItem('active_chat_user_id', activeUser.id);
             fetchConversation(activeUser.id);
         } else {
             setMessages([]);
         }
     }, [activeUser]);
+
+    // Hàm xử lý khi bấm nút đóng/quay lại cuộc trò chuyện
+    const handleCloseChat = () => {
+        setActiveUser(null);
+        // Xóa ID khỏi bộ nhớ khi chủ động đóng chat
+        localStorage.removeItem('active_chat_user_id');
+    };
 
     // Chọn ảnh để gửi
     const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -120,7 +189,7 @@ export default function ChatManagement() {
         if (fileInputRef.current) fileInputRef.current.value = '';
     };
 
-    // POST: Gửi tin nhắn dùng FormData (multipart/form-data) chuẩn Swagger
+    // Gửi tin nhắn dùng FormData
     const handleSendMessage = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!activeUser || (!inputText.trim() && !selectedImage) || isSending) return;
@@ -128,11 +197,11 @@ export default function ChatManagement() {
         try {
             setIsSending(true);
             const formData = new FormData();
-            formData.append('SenderId', CURRENT_USER_ID);
-            formData.append('ReceiverId', activeUser.id);
+
+            formData.append('TenantId', activeUser.id);
             formData.append('Content', inputText.trim());
-            // Quy ước Type: 0 là chữ, 1 là có ảnh đi kèm
-            formData.append('Type', selectedImage ? '1' : '0');
+            formData.append('Type', selectedImage ? 'Image' : 'Text');
+
             if (selectedImage) {
                 formData.append('Image', selectedImage);
             }
@@ -156,7 +225,51 @@ export default function ChatManagement() {
         }
     };
 
-    // Lọc danh sách người dùng theo thanh tìm kiếm
+    // Tải ảnh trực tiếp về máy
+    const handleDownloadImage = async (imgUrl: string, filename = 'tai-anh-chat.jpg') => {
+        try {
+            const response = await fetch(imgUrl);
+            const blob = await response.blob();
+            const blobUrl = window.URL.createObjectURL(blob);
+
+            const link = document.createElement('a');
+            link.href = blobUrl;
+            link.download = filename;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            window.URL.revokeObjectURL(blobUrl);
+            toast.success("Tải ảnh xuống thành công!");
+        } catch {
+            window.open(imgUrl, '_blank');
+        }
+    };
+
+    // Nhãn chia nhóm ngày tháng
+    const getDateLabel = (dateStr: string): string => {
+        const d = new Date(dateStr);
+        const today = new Date();
+        const yesterday = new Date();
+        yesterday.setDate(today.getDate() - 1);
+
+        const isSameDay = (d1: Date, d2: Date) =>
+            d1.getFullYear() === d2.getFullYear() &&
+            d1.getMonth() === d2.getMonth() &&
+            d1.getDate() === d2.getDate();
+
+        if (isSameDay(d, today)) {
+            return "Hôm nay";
+        } else if (isSameDay(d, yesterday)) {
+            return "Hôm qua";
+        } else {
+            return d.toLocaleDateString('vi-VN', {
+                day: '2-digit',
+                month: 'long',
+                year: 'numeric'
+            });
+        }
+    };
+
     const filteredUsers = users.filter(u =>
         u.name.toLowerCase().includes(searchUser.toLowerCase())
     );
@@ -193,37 +306,53 @@ export default function ChatManagement() {
                         ) : filteredUsers.length === 0 ? (
                             <p className="text-center text-gray-400 text-xs py-10">Không tìm thấy khách thuê</p>
                         ) : (
-                            filteredUsers.map((user) => (
-                                <button
-                                    key={user.id}
-                                    onClick={() => setActiveUser(user)}
-                                    className={`w-full p-4 flex items-center gap-3 hover:bg-blue-100 transition-colors text-left ${activeUser?.id === user.id ? 'bg-blue-50' : ''
-                                        }`}
-                                >
-                                    <div className="w-10 h-10 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center shrink-0">
-                                        {user.avatarUrl ? (
-                                            <img src={user.avatarUrl} alt={user.name} className="w-10 h-10 rounded-full object-cover" />
-                                        ) : (
-                                            <User className="w-5 h-5" />
+                            filteredUsers.map((u) => {
+                                const hasUnread = (u.unreadCount ?? 0) > 0;
+                                return (
+                                    <button
+                                        key={u.id}
+                                        onClick={() => setActiveUser(u)}
+                                        className={`w-full p-4 flex items-center gap-3 hover:bg-blue-100 transition-colors text-left relative ${activeUser?.id === u.id ? 'bg-blue-100/70' : ''
+                                            }`}
+                                    >
+                                        <div className="w-10 h-10 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center shrink-0 relative">
+                                            {u.avatarUrl ? (
+                                                <img src={u.avatarUrl} alt={u.name} className="w-10 h-10 rounded-full object-cover" />
+                                            ) : (
+                                                <User className="w-5 h-5" />
+                                            )}
+                                        </div>
+
+                                        <div className="flex-1 min-w-0">
+                                            <h4 className={`text-sm truncate ${hasUnread ? 'font-bold text-gray-900' : 'font-medium text-gray-700'
+                                                }`}>
+                                                {u.name}
+                                            </h4>
+                                            <p className={`text-xs truncate mt-0.5 ${hasUnread ? 'font-semibold text-blue-600' : 'text-gray-400'
+                                                }`}>
+                                                {hasUnread ? 'Có tin nhắn mới chưa xem' : 'Nhấn để bắt đầu trò chuyện'}
+                                            </p>
+                                        </div>
+
+                                        {/* Dấu hiệu có tin nhắn mới */}
+                                        {hasUnread && (
+                                            <div className="w-2.5 h-2.5 rounded-full bg-blue-600 shrink-0 absolute right-4 top-1/2 -translate-y-1/2 shadow-sm animate-pulse" />
                                         )}
-                                    </div>
-                                    <div className="flex-1 min-w-0">
-                                        <h4 className="font-medium text-sm text-gray-900 truncate">{user.name}</h4>
-                                        <p className="text-xs text-gray-500 truncate">Nhấn để bắt đầu trò chuyện</p>
-                                    </div>
-                                </button>
-                            ))
+                                    </button>
+                                );
+                            })
                         )}
                     </div>
                 </div>
 
-                {/* CỘT PHẢI: KHUNG CHÁT CHI TIẾT */}
+                {/* CỘT PHẢI: KHUNG CHAT CHI TIẾT */}
                 <div className={`flex-1 flex flex-col bg-gray-50 ${!activeUser ? 'hidden md:flex items-center justify-center' : 'flex'}`}>
                     {activeUser ? (
                         <>
                             {/* Header khung chat */}
                             <div className="bg-white border-b border-gray-200 px-4 py-3 flex items-center gap-3">
-                                <button onClick={() => setActiveUser(null)} className="md:hidden p-1 hover:bg-gray-100 rounded-lg">
+                                {/* Sử dụng hàm handleCloseChat để xóa lịch sử lưu F5 khi thoát chat */}
+                                <button onClick={handleCloseChat} className="p-1 hover:bg-gray-100 rounded-lg">
                                     <ArrowLeft className="w-5 h-5 text-gray-600" />
                                 </button>
                                 <div className="w-9 h-9 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center font-bold">
@@ -231,9 +360,9 @@ export default function ChatManagement() {
                                 </div>
                                 <div>
                                     <h3 className="font-semibold text-sm text-gray-900">{activeUser.name}</h3>
-                                    <p className="text-[10px] text-green-600 flex items-center gap-1">
+                                    {/* <p className="text-[10px] text-green-600 flex items-center gap-1">
                                         <span className="w-1.5 h-1.5 rounded-full bg-green-500 inline-block"></span> Đang trực tuyến
-                                    </p>
+                                    </p> */}
                                 </div>
                             </div>
 
@@ -249,22 +378,68 @@ export default function ChatManagement() {
                                         <p className="text-xs">Hãy gửi tin nhắn đầu tiên để bắt đầu hội thoại!</p>
                                     </div>
                                 ) : (
-                                    messages.map((msg) => {
-                                        const isMe = msg.senderId === CURRENT_USER_ID;
+                                    messages.map((msg, index) => {
+                                        const messageId = msg.id || "";
+                                        const isMe = msg.senderRole === 'Admin' || msg.senderId === CURRENT_USER_ID;
+
+                                        const currentMsgDate = new Date(msg.createdAt).toDateString();
+                                        const prevMsgDate = index > 0 ? new Date(messages[index - 1].createdAt).toDateString() : null;
+                                        const showDateSeparator = currentMsgDate !== prevMsgDate;
+
                                         return (
-                                            <div key={msg.id} className={`flex ${isMe ? 'justify-end' : 'justify-start'}`}>
-                                                <div className={`max-w-[70%] rounded-2xl px-4 py-2.5 text-sm shadow-sm ${isMe ? 'bg-blue-600 text-white rounded-br-none' : 'bg-white text-gray-900 rounded-bl-none border border-gray-100'
-                                                    }`}>
-                                                    {msg.content && <p className="leading-relaxed break-words">{msg.content}</p>}
+                                            <div key={messageId} className="space-y-4">
+                                                {showDateSeparator && (
+                                                    <div className="flex items-center justify-center my-6">
+                                                        <div className="h-[1px] bg-gray-200 flex-grow max-w-[15%] md:max-w-[25%]"></div>
+                                                        <span className="mx-4 text-xs font-medium text-gray-400 bg-gray-100 px-3 py-1 rounded-full shadow-sm">
+                                                            {getDateLabel(msg.createdAt)}
+                                                        </span>
+                                                        <div className="h-[1px] bg-gray-200 flex-grow max-w-[15%] md:max-w-[25%]"></div>
+                                                    </div>
+                                                )}
 
-                                                    {/* Hiển thị ảnh nếu có */}
-                                                    {msg.type === 1 && msg.imageUrl && (
-                                                        <img src={msg.imageUrl} alt="Gửi kèm" className="mt-2 rounded-lg max-h-60 object-cover" />
-                                                    )}
+                                                <div className={`flex ${isMe ? 'justify-end' : 'justify-start'}`}>
+                                                    <div className={`max-w-[70%] rounded-2xl px-4 py-2.5 text-sm shadow-sm ${isMe ? 'bg-blue-500 text-white rounded-br-none' : 'bg-white text-gray-900 rounded-bl-none border border-gray-100'
+                                                        }`}>
+                                                        {msg.content && <p className="leading-relaxed break-words">{msg.content}</p>}
 
-                                                    <div className={`flex items-center justify-end gap-1 mt-1 text-[9px] ${isMe ? 'text-blue-200' : 'text-gray-400'}`}>
-                                                        <span>{new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
-                                                        {isMe && <CheckCheck className="w-3.5 h-3.5 text-blue-100" />}
+                                                        {msg.type === "Image" && msg.imageUrl && (
+                                                            <div className="relative mt-2 rounded-lg overflow-hidden border border-black/10 group/img">
+                                                                <img
+                                                                    src={msg.imageUrl}
+                                                                    alt="Hình ảnh trò chuyện"
+                                                                    className="max-h-60 max-w-full object-cover rounded-lg"
+                                                                />
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => handleDownloadImage(msg.imageUrl!)}
+                                                                    className="absolute top-2 right-2 bg-black/60 hover:bg-black/80 text-white p-1.5 rounded-full opacity-0 group-hover/img:opacity-100 transition-opacity"
+                                                                    title="Lưu ảnh về máy"
+                                                                >
+                                                                    <Download className="w-4 h-4" />
+                                                                </button>
+                                                            </div>
+                                                        )}
+
+                                                        <div className={`flex items-center justify-end gap-1 mt-1 text-[9px] ${isMe ? 'text-blue-200' : 'text-gray-400'}`}>
+                                                            <span>{new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+
+                                                            {isMe && (
+                                                                <div className="flex items-center gap-0.5 ml-1" title={msg.isRead ? "Người thuê đã xem" : "Tin nhắn đã gửi thành công"}>
+                                                                    {msg.isRead ? (
+                                                                        <>
+                                                                            <span className="font-medium text-blue-100">Đã xem</span>
+                                                                            <CheckCheck className="w-3 h-3 text-cyan-200 stroke-[2.5]" />
+                                                                        </>
+                                                                    ) : (
+                                                                        <>
+                                                                            <span className="text-blue-300">Đã gửi</span>
+                                                                            <Check className="w-3 h-3 text-blue-300 stroke-[2.5]" />
+                                                                        </>
+                                                                    )}
+                                                                </div>
+                                                            )}
+                                                        </div>
                                                     </div>
                                                 </div>
                                             </div>
@@ -274,7 +449,7 @@ export default function ChatManagement() {
                                 <div ref={messagesEndRef} />
                             </div>
 
-                            {/* Giao diện xem trước ảnh chọn gửi kèm */}
+                            {/* Giao diện xem trước ảnh */}
                             {imagePreview && (
                                 <div className="px-4 py-2 bg-white border-t border-gray-100 flex items-center gap-3">
                                     <div className="relative w-16 h-16 rounded-lg overflow-hidden border">
@@ -321,7 +496,7 @@ export default function ChatManagement() {
                                 <button
                                     type="submit"
                                     disabled={isSending || (!inputText.trim() && !selectedImage)}
-                                    className="p-2.5 bg-blue-600 text-white rounded-full hover:bg-blue-700 disabled:opacity-50 disabled:hover:bg-blue-600 transition-colors shrink-0"
+                                    className="p-2.5 bg-blue-600 text-white rounded-full hover:bg-blue-500 disabled:opacity-50 disabled:hover:bg-blue-600 transition-colors shrink-0"
                                 >
                                     {isSending ? (
                                         <Loader2 className="w-4 h-4 animate-spin" />

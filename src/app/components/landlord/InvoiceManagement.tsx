@@ -4,18 +4,17 @@ import * as Dialog from '@radix-ui/react-dialog';
 import { toast } from 'sonner';
 import { fetchApi } from '../../utils/api';
 
-// Interface
+// Interface cập nhật chuẩn theo Backend Swagger
 interface Invoice {
   id: string;
-  createdAt: string;
-  updatedAt: string;
   invoiceNumber: string;
   roomNumber: string;
   tenantName: string;
   billingPeriod: string;
-  dueTime: string;
+  dueDate: string; // Đổi từ dueTime -> dueDate theo backend
   status: number;  // 0 = Chờ thanh toán, 1 = Đã thanh toán, 2 = Quá hạn
   statusLabel: string;
+  paidAmount: number;
   roomPrice: number;
   electricUsage: number;
   electricPrice: number;
@@ -25,6 +24,7 @@ interface Invoice {
   waterTotal: number;
   serviceFee: number;
   amount: number;
+  note: string;
 }
 
 // Option phục vụ thẻ select tự động map dữ liệu
@@ -41,7 +41,7 @@ const blankCreateFormData = {
   waterPrice: 12000,
   serviceFee: 150000,
   roomPrice: 0,
-  dueTime: '',
+  dueDate: '', // Đổi từ dueTime -> dueDate
 };
 
 export default function InvoiceManagement() {
@@ -111,7 +111,7 @@ export default function InvoiceManagement() {
   // Hàm POST: Gửi dữ liệu tạo hóa đơn mới lên Swagger Server
   const handleCreateInvoice = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!createFormData.roomNumber || !createFormData.tenantName || !createFormData.dueTime) {
+    if (!createFormData.roomNumber || !createFormData.tenantName || !createFormData.dueDate) {
       toast.error('Vui lòng chọn đầy đủ Phòng, Khách thuê và Hạn thanh toán!');
       return;
     }
@@ -131,7 +131,7 @@ export default function InvoiceManagement() {
       waterPrice: createFormData.waterPrice,
       serviceFee: createFormData.serviceFee,
       amount: totalAmount,
-      dueTime: new Date(createFormData.dueTime).toISOString()
+      dueDate: new Date(createFormData.dueDate).toISOString() // Đồng bộ cấu trúc tên trường theo Swagger
     };
 
     try {
@@ -285,7 +285,7 @@ export default function InvoiceManagement() {
                       <td className="px-6 py-4">{invoice.tenantName}</td>
                       <td className="px-6 py-4">{invoice.billingPeriod}</td>
                       <td className="px-6 py-4 text-blue-600 font-semibold">{(invoice.amount || 0).toLocaleString('vi-VN')} ₫</td>
-                      <td className="px-6 py-4 text-gray-500">{invoice.dueTime ? new Date(invoice.dueTime).toLocaleDateString('vi-VN') : '---'}</td>
+                      <td className="px-6 py-4 text-gray-500">{invoice.dueDate ? new Date(invoice.dueDate).toLocaleDateString('vi-VN') : '---'}</td>
                       <td className="px-6 py-4">{getStatusBadge(invoice.status, invoice.statusLabel)}</td>
                       <td className="px-6 py-4">
                         <div className="flex items-center justify-center gap-1">
@@ -310,7 +310,7 @@ export default function InvoiceManagement() {
           <Dialog.Content aria-describedby={undefined} className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-white rounded-lg p-6 w-full max-w-2xl max-h-[90vh] overflow-auto z-50 text-sm shadow-2xl">
             {selectedInvoice && (
               <>
-                <Dialog.Title className="text-xl font-bold border-b pb-3 mb-4 flex justify-between items-center">
+                <Dialog.Title className="text-xl font-bold border-b border-gray-400 pb-3 mb-4 flex justify-between items-center">
                   <span>Hóa đơn: {selectedInvoice.invoiceNumber || 'Hệ thống'}</span>
                   {getStatusBadge(selectedInvoice.status, selectedInvoice.statusLabel)}
                 </Dialog.Title>
@@ -319,7 +319,7 @@ export default function InvoiceManagement() {
                     <div><p className="text-gray-400 text-xs">Phòng liên kết</p><p className="font-semibold text-gray-900">Phòng {selectedInvoice.roomNumber}</p></div>
                     <div><p className="text-gray-400 text-xs">Chủ hộ thuê</p><p className="font-semibold text-gray-900">{selectedInvoice.tenantName}</p></div>
                     <div><p className="text-gray-400 text-xs">Kỳ đóng tiền</p><p className="font-medium">{selectedInvoice.billingPeriod}</p></div>
-                    <div><p className="text-gray-400 text-xs">Hạn cuối thanh toán</p><p className="font-medium text-red-600">{new Date(selectedInvoice.dueTime).toLocaleDateString('vi-VN')}</p></div>
+                    <div><p className="text-gray-400 text-xs">Hạn cuối thanh toán</p><p className="font-medium text-red-600">{new Date(selectedInvoice.dueDate).toLocaleDateString('vi-VN')}</p></div>
                   </div>
 
                   <div>
@@ -329,14 +329,14 @@ export default function InvoiceManagement() {
                       <div className="flex justify-between text-gray-600"><span>Tiền điện ({selectedInvoice.electricUsage} kWh × {selectedInvoice.electricPrice} ₫)</span><span>{selectedInvoice.electricTotal.toLocaleString('vi-VN')} ₫</span></div>
                       <div className="flex justify-between text-gray-600"><span>Tiền nước ({selectedInvoice.waterUsage} m³ × {selectedInvoice.waterPrice} ₫)</span><span>{selectedInvoice.waterTotal.toLocaleString('vi-VN')} ₫</span></div>
                       <div className="flex justify-between text-gray-600"><span>Phí quản lý dịch vụ cố định</span><span>{(selectedInvoice.serviceFee || 0).toLocaleString('vi-VN')} ₫</span></div>
-                      <div className="flex justify-between pt-3 border-t text-base font-bold text-gray-900">
+                      <div className="flex justify-between pt-3 border-t border-gray-500 text-base font-bold text-gray-900">
                         <span>Tổng chi phí cần thanh toán</span>
                         <span className="text-blue-600">{(selectedInvoice.amount || 0).toLocaleString('vi-VN')} ₫</span>
                       </div>
                     </div>
                   </div>
 
-                  <div className="flex gap-2 pt-2 border-t">
+                  <div className="flex gap-2 pt-2 border-t border-gray-400">
                     <Dialog.Close className="flex-1 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 font-medium">Đóng</Dialog.Close>
                     {selectedInvoice.status !== 1 && (
                       <button onClick={() => handlePayInvoice(selectedInvoice.id)} className="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg font-medium hover:bg-green-700 transition-colors">
@@ -383,7 +383,7 @@ export default function InvoiceManagement() {
         <Dialog.Portal>
           <Dialog.Overlay className="fixed inset-0 bg-black/50 z-40" />
           <Dialog.Content aria-describedby={undefined} className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-white rounded-lg p-6 w-full max-w-2xl max-h-[90vh] overflow-auto z-50 text-sm shadow-2xl">
-            <Dialog.Title className="text-xl font-bold mb-4 border-b pb-2">Lập hóa đơn thanh toán tháng</Dialog.Title>
+            <Dialog.Title className="text-xl font-bold mb-4 border-b border-gray-300 pb-2">Lập hóa đơn thanh toán tháng</Dialog.Title>
             <form className="space-y-4" onSubmit={handleCreateInvoice}>
               <div className="grid grid-cols-2 gap-4">
                 <div>
@@ -409,11 +409,11 @@ export default function InvoiceManagement() {
                 </div>
                 <div>
                   <label className="block font-medium mb-1 text-gray-700">Hạn cuối đóng tiền <span className="text-red-500">*</span></label>
-                  <input type="date" value={createFormData.dueTime} onChange={(e) => setCreateFormData({ ...createFormData, dueTime: e.target.value })} className="w-full px-3 py-2 border border-gray-300 rounded-lg" required />
+                  <input type="date" value={createFormData.dueDate} onChange={(e) => setCreateFormData({ ...createFormData, dueDate: e.target.value })} className="w-full px-3 py-2 border border-gray-300 rounded-lg" required />
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-4 border-t pt-3">
+              <div className="grid grid-cols-2 gap-4 border-t border-gray-300 pt-3">
                 <div>
                   <label className="block font-medium mb-1 text-gray-600">Điện tiêu thụ (kWh)</label>
                   <input type="number" value={createFormData.electricUsage} onChange={(e) => setCreateFormData({ ...createFormData, electricUsage: Number(e.target.value) })} className="w-full px-3 py-2 border border-gray-300 rounded-lg" required />
@@ -447,7 +447,7 @@ export default function InvoiceManagement() {
                 </span>
               </div>
 
-              <div className="flex gap-2 pt-2 border-t">
+              <div className="flex gap-2 pt-2 border-t border-gray-300">
                 <Dialog.Close type="button" className="flex-1 px-4 py-2 border border-gray-300 rounded-lg font-medium">Hủy</Dialog.Close>
                 <button type="submit" className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700">Lưu dữ liệu thực</button>
               </div>

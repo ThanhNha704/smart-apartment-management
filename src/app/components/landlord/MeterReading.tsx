@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Camera, Upload, Calendar, CheckCircle, Loader2 } from 'lucide-react';
+import { Camera, Upload, Calendar, CheckCircle, Loader2, Info } from 'lucide-react';
 import { toast } from 'sonner';
 import { fetchApi } from '../../utils/api'; 
 
@@ -14,7 +14,7 @@ interface MeterReadingItem {
   id: string;
   roomNumber: string;
   tenantName: string;
-  type: string;
+  type: number;          // Đã sửa từ string sang number theo API Backend (0: Điện, 1: Nước)
   typeLabel: string; 
   month: number;
   year: number;
@@ -35,7 +35,9 @@ export default function MeterReading() {
 
   const [selectedRoomNumber, setSelectedRoomNumber] = useState('');
   const [currentIndex, setCurrentIndex] = useState('');
-  const [meterType, setMeterType] = useState<string>('Điện');
+  
+  // State quản lý loại công tơ: sử dụng '0' cho Điện và '1' cho Nước
+  const [meterType, setMeterType] = useState<number>(0); 
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isScanning, setIsScanning] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -77,10 +79,25 @@ export default function MeterReading() {
     fetchData();
   }, [selectedRoomNumber]);
 
-  // Hàm POST: Xử lý khi người dùng chọn file ảnh gửi dạng Multipart (OCR)
+  // Hàm xử lý tải file ảnh lên (Hỗ trợ quét tự động OCR)
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+
+    // Kiểm tra định dạng ảnh cơ bản
+    const validTypes = ['image/jpeg', 'image/png', 'image/jpg'];
+    if (!validTypes.includes(file.type)) {
+      toast.error('Định dạng ảnh không hợp lệ! Vui lòng chọn ảnh .jpg, .jpeg hoặc .png');
+      e.target.value = '';
+      return;
+    }
+
+    // Kiểm tra dung lượng ảnh tối đa
+    if (file.size > 10 * 1024 * 1024) {
+      toast.error('Kích thước ảnh quá lớn! Vui lòng chọn ảnh dưới 10MB.');
+      e.target.value = '';
+      return;
+    }
 
     if (!selectedRoomNumber) {
       toast.error('Vui lòng chọn phòng trước khi tải ảnh!');
@@ -94,7 +111,7 @@ export default function MeterReading() {
     const formData = new FormData();
     formData.append('RoomNumber', selectedRoomNumber);
     formData.append('MeterIndex', '0'); 
-    formData.append('Type', meterType);
+    formData.append('Type', meterType.toString());
     formData.append('Photo', file);
 
     try {
@@ -114,13 +131,13 @@ export default function MeterReading() {
       }
     } catch (error) {
       console.error(error);
-      toast.error('Không thể kết nối tới máy chủ OCR');
+      toast.error('Không thể kết nối tới máy chủ quét ảnh');
     } finally {
       setIsScanning(false);
     }
   };
 
-  // Hàm POST: Xác nhận/Lưu thủ công chỉ số công tơ
+  // Hàm xác nhận/Lưu thủ công chỉ số công tơ
   const handleSubmitReading = async () => {
     if (!selectedRoomNumber || !currentIndex) {
       toast.error('Vui lòng chọn phòng và nhập số công tơ!');
@@ -131,7 +148,7 @@ export default function MeterReading() {
     const formData = new FormData();
     formData.append('RoomNumber', selectedRoomNumber);
     formData.append('MeterIndex', currentIndex);
-    formData.append('Type', meterType);
+    formData.append('Type', meterType.toString());
     if (selectedFile) {
       formData.append('Photo', selectedFile);
     }
@@ -164,7 +181,7 @@ export default function MeterReading() {
     <div className="p-6 max-w-7xl mx-auto">
       <div className="mb-6">
         <h1 className="text-2xl font-semibold mb-1">Đọc số công tơ</h1>
-        <p className="text-gray-600">Ghi nhận số công tơ hàng tháng bằng OCR tích hợp hoặc nhập thủ công</p>
+        <p className="text-gray-600">Ghi nhận số công tơ hàng tháng bằng công nghệ quét ảnh tự động hoặc nhập thủ công</p>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
@@ -182,8 +199,8 @@ export default function MeterReading() {
                     <input
                       type="radio"
                       name="meterType"
-                      checked={meterType === 'Điện'}
-                      onChange={() => setMeterType('Điện')}
+                      checked={meterType === 0}
+                      onChange={() => setMeterType(0)}
                       className="text-blue-600 focus:ring-blue-500"
                     />
                     Công tơ Điện
@@ -192,8 +209,8 @@ export default function MeterReading() {
                     <input
                       type="radio"
                       name="meterType"
-                      checked={meterType === 'Nước'}
-                      onChange={() => setMeterType('Nước')}
+                      checked={meterType === 1}
+                      onChange={() => setMeterType(1)}
                       className="text-blue-600 focus:ring-blue-500"
                     />
                     Công tơ Nước
@@ -223,16 +240,17 @@ export default function MeterReading() {
                 {isScanning ? (
                   <div className="space-y-3 py-4">
                     <div className="w-12 h-12 mx-auto border-4 border-blue-600 border-t-transparent rounded-full animate-spin" />
-                    <p className="text-gray-600 text-sm">Đang upload & nhận diện số từ ảnh...</p>
+                    <p className="text-gray-600 text-sm">Đang quét và nhận dạng con số từ ảnh chụp...</p>
                   </div>
                 ) : (
                   <>
                     <Camera className="w-10 h-10 mx-auto mb-2 text-gray-400" />
-                    <p className="text-sm text-gray-500 mb-3">Chụp ảnh hoặc tải lên ảnh số công tơ hiện tại</p>
+                    <p className="text-sm text-gray-500 mb-1 font-medium">Chụp ảnh hoặc chọn file ảnh công tơ</p>
+                    <p className="text-xs text-gray-400 mb-3">(Hỗ trợ định dạng JPG, JPEG, PNG dung lượng dưới 10MB)</p>
                     <div className="flex gap-2 justify-center">
                       <label className="px-4 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 flex items-center gap-1.5 transition-colors cursor-pointer">
                         <Upload className="w-4 h-4" />
-                        Chọn file / Máy ảnh
+                        Chọn ảnh từ thiết bị
                         <input
                           type="file"
                           accept="image/*"
@@ -242,7 +260,7 @@ export default function MeterReading() {
                       </label>
                     </div>
                     {selectedFile && (
-                      <p className="text-xs text-green-600 mt-2 font-medium">Tệp đã chọn: {selectedFile.name}</p>
+                      <p className="text-xs text-green-600 mt-2 font-medium">Ảnh đã nạp: {selectedFile.name}</p>
                     )}
                   </>
                 )}
@@ -255,7 +273,7 @@ export default function MeterReading() {
                   type="number"
                   value={currentIndex}
                   onChange={(e) => setCurrentIndex(e.target.value)}
-                  placeholder="Nhập thủ công hoặc hệ thống tự điền sau khi quét ảnh"
+                  placeholder="Hệ thống tự điền sau khi quét ảnh, hoặc bạn có thể tự nhập"
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
               </div>
@@ -268,23 +286,23 @@ export default function MeterReading() {
             className="w-full mt-6 px-4 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:bg-gray-400 flex items-center justify-center gap-2 font-medium transition-colors"
           >
             <CheckCircle className="w-5 h-5" />
-            {isSubmitting ? 'Đang lưu kết quả...' : 'Xác nhận ghi số'}
+            {isSubmitting ? 'Đang lưu kết quả...' : 'Xác nhận lưu chỉ số'}
           </button>
         </div>
 
         {/* LỊCH SỬ GHI SỐ THỰC TẾ */}
         <div className="bg-white rounded-lg border border-gray-200 p-6 overflow-y-auto max-h-[600px]">
           <h3 className="font-semibold mb-4 text-gray-800">
-            {selectedRoomNumber ? `Lịch sử ghi số phòng ${selectedRoomNumber}` : 'Lịch sử ghi số gần đây'}
+            {selectedRoomNumber ? `Lịch sử ghi số phòng ${selectedRoomNumber}` : 'Lịch sử ghi nhận gần đây'}
           </h3>
           <div className="space-y-3">
             {isLoading ? (
               <div className="flex flex-col items-center justify-center py-12 gap-2 text-gray-500">
                 <Loader2 className="w-6 h-6 animate-spin text-blue-600" />
-                <p className="text-xs">Đang đồng bộ lịch sử chỉ số...</p>
+                <p className="text-xs">Đang tải lịch sử chỉ số...</p>
               </div>
             ) : readings.length === 0 ? (
-              <p className="text-sm text-gray-500 text-center py-8">Chưa có dữ liệu ghi nhận chỉ số.</p>
+              <p className="text-sm text-gray-500 text-center py-8">Chưa ghi nhận chỉ số công tơ nào trong kỳ này.</p>
             ) : (
               readings.map((reading) => (
                 <div key={reading.id} className="p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors">
@@ -298,24 +316,24 @@ export default function MeterReading() {
                           <Calendar className="w-3 h-3" /> Tháng {reading.month}/{reading.year}
                         </span>
                         <span className="px-2 py-0.5 bg-gray-100 text-gray-700 rounded-full font-medium">
-                          {reading.typeLabel || reading.type}
+                          {reading.typeLabel || (reading.type === 0 ? 'Điện' : 'Nước')}
                         </span>
                       </div>
                     </div>
                   </div>
                   <div className="grid grid-cols-3 gap-2 text-sm mt-3 pt-2 border-t border-gray-100">
                     <div>
-                      <p className="text-gray-500 text-xs">Số cũ</p>
+                      <p className="text-gray-500 text-xs">Chỉ số cũ</p>
                       <p className="font-medium text-gray-700">{reading.previousIndex}</p>
                     </div>
                     <div>
-                      <p className="text-gray-500 text-xs">Số mới</p>
+                      <p className="text-gray-500 text-xs">Chỉ số mới</p>
                       <p className="font-medium text-gray-700">{reading.currentIndex}</p>
                     </div>
                     <div>
                       <p className="text-gray-500 text-xs">Tiêu thụ</p>
                       <p className="font-semibold text-blue-600">
-                        {reading.usageLabel || `${reading.usage} ${reading.type === 'Điện' ? 'kWh' : 'm³'}`}
+                        {reading.usageLabel || `${reading.usage} ${reading.type === 0 ? 'kWh' : 'm³'}`}
                       </p>
                     </div>
                   </div>
@@ -332,14 +350,18 @@ export default function MeterReading() {
         </div>
       </div>
 
-      {/* HƯỚNG DẪN */}
-      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-        <h4 className="font-medium text-blue-900 mb-1">💡 Hướng dẫn tích hợp thực tế</h4>
-        <ul className="text-sm text-blue-800 space-y-1">
-          <li>• Chọn chính xác <strong>Loại công tơ (Điện/Nước)</strong> và <strong>Phòng</strong> trước khi thao tác file.</li>
-          <li>• Sử dụng nút tải ảnh lên để gọi trực tiếp API OCR `POST /api/MeterReadings` truyền dữ liệu dạng `multipart/form-data`.</li>
-          <li>• Nếu ảnh mờ hoặc nhận diện sai, bạn có thể tự do ghi đè/nhập lại thủ công vào ô <strong>Số công tơ hiện tại</strong> rồi bấm Xác nhận.</li>
-        </ul>
+      {/* HƯỚNG DẪN SỬ DỤNG CHO NGƯỜI DÙNG */}
+      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 flex gap-3 items-start">
+        <Info className="w-5 h-5 text-blue-600 shrink-0 mt-0.5" />
+        <div>
+          <h4 className="font-semibold text-blue-950 text-sm mb-1">💡 Hướng dẫn sử dụng tính năng</h4>
+          <ul className="text-xs text-blue-900 space-y-1.5 leading-relaxed">
+            <li>• <strong>Bước 1:</strong> Chọn đúng loại công tơ cần ghi (<strong>Điện</strong> hoặc <strong>Nước</strong>) và chọn phòng tương ứng.</li>
+            <li>• <strong>Bước 2:</strong> Nhấp nút <strong>"Chọn ảnh từ thiết bị"</strong> để chụp ảnh công tơ trực tiếp hoặc tải ảnh từ thư viện lên. Hệ thống sẽ tự động quét, đọc và nhập chỉ số vào ô dưới.</li>
+            <li>• <strong>Bước 3:</strong> Bạn hãy kiểm tra lại kỹ con số vừa quét. Nếu hệ thống quét sai do ảnh bị mờ/mất góc, bạn có thể <strong>tự nhập đè chỉnh sửa lại bằng tay</strong> cho chính xác.</li>
+            <li>• <strong>Bước 4:</strong> Nhấn <strong>"Xác nhận lưu chỉ số"</strong> để tiến hành cập nhật dữ liệu và tính tiền tự động cho phòng trọ.</li>
+          </ul>
+        </div>
       </div>
     </div>
   );

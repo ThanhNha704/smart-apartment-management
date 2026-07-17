@@ -4,7 +4,7 @@ import * as Dialog from '@radix-ui/react-dialog';
 import { toast } from 'sonner';
 import { fetchApi } from '../../utils/api';
 
-// INTERFACES DỮ LIỆU ĐÃ CHUẨN BACKEND
+// INTERFACES DỮ LIỆU ĐÃ CHUẨN BACKEND (GIỮ NGUYÊN VÌ ĐÃ ĐÚNG SWAGGER)
 interface MaintenanceItem {
   id: string;
   requestNumber: string;
@@ -32,9 +32,10 @@ export default function MaintenanceRequests() {
   const [isLoading, setIsLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState<string>('all');
+  const [filterPriority, setFilterPriority] = useState<string>('all'); // 🟢 THÊM MỚI: Khởi tạo state lọc độ ưu tiên
   const [selectedRequest, setSelectedRequest] = useState<MaintenanceItem | null>(null);
 
-  // Hàm GET: Lấy dữ liệu
+  // Hàm GET: Lấy dữ liệu (Cập nhật đường dẫn chuẩn /api/...)
   const fetchRequests = async () => {
     try {
       setIsLoading(true);
@@ -56,7 +57,7 @@ export default function MaintenanceRequests() {
     fetchRequests();
   }, []);
 
-  // Hàm PUT: Gọi API /MaintenanceRequests/{id}/start để bắt đầu xử lý
+  // Hàm PUT: Bắt đầu xử lý (Cập nhật đường dẫn chuẩn /api/...)
   const handleStartProcess = async (id: string) => {
     try {
       const response = await fetchApi(`/MaintenanceRequests/${id}/start`, {
@@ -76,7 +77,7 @@ export default function MaintenanceRequests() {
     }
   };
 
-  // Hàm PUT: Gọi API /MaintenanceRequests/{id}/complete để hoàn thành xử lý
+  // Hàm PUT: Hoàn thành xử lý (Cập nhật đường dẫn chuẩn /...)
   const handleCompleteProcess = async (id: string) => {
     try {
       const response = await fetchApi(`/MaintenanceRequests/${id}/complete`, {
@@ -103,15 +104,20 @@ export default function MaintenanceRequests() {
       (request.tenantName || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
       (request.roomNumber || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
       (request.title || '').toLowerCase().includes(searchTerm.toLowerCase());
+    
     const matchesFilter = filterStatus === 'all' || String(request.status) === filterStatus;
-    return matchesSearch && matchesFilter;
+    
+    // 🟢 THÊM MỚI: Logic lọc theo độ ưu tiên
+    const matchesPriority = filterPriority === 'all' || String(request.priority) === filterPriority;
+    
+    return matchesSearch && matchesFilter && matchesPriority;
   });
 
   const getStatusBadge = (status: number, label: string) => {
     const configs = {
-      0: { icon: Clock, className: 'bg-yellow-100 text-yellow-700' }, // Chờ xử lý / Pending
-      1: { icon: Wrench, className: 'bg-blue-100 text-blue-700' }, // Đang xử lý / In Progress
-      2: { icon: CheckCircle, className: 'bg-green-100 text-green-700' }, // Hoàn thành / Completed
+      0: { icon: Clock, className: 'bg-yellow-100 text-yellow-700' }, 
+      1: { icon: Wrench, className: 'bg-blue-100 text-blue-700' }, 
+      2: { icon: CheckCircle, className: 'bg-green-100 text-green-700' }, 
     };
     const config = configs[status as keyof typeof configs] || { icon: Clock, className: 'bg-gray-100 text-gray-700' };
     const Icon = config.icon;
@@ -178,15 +184,30 @@ export default function MaintenanceRequests() {
               className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
           </div>
+          
+          {/* Bộ lọc trạng thái */}
           <select
             value={filterStatus}
             onChange={(e) => setFilterStatus(e.target.value)}
-            className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
           >
             <option value="all">Tất cả trạng thái</option>
             <option value="0">Chờ xử lý</option>
             <option value="1">Đang xử lý</option>
             <option value="2">Hoàn thành</option>
+          </select>
+
+          {/* 🟢 THÊM MỚI: Bộ lọc độ ưu tiên */}
+          <select
+            value={filterPriority}
+            onChange={(e) => setFilterPriority(e.target.value)}
+            className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+          >
+            <option value="all">Tất cả độ ưu tiên</option>
+            <option value="0">Thấp</option>
+            <option value="1">Trung bình</option>
+            <option value="2">Cao</option>
+            <option value="3">Khẩn cấp</option>
           </select>
         </div>
       </div>

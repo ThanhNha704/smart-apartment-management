@@ -13,21 +13,21 @@ const RoomStatus = {
 
 type RoomStatus = typeof RoomStatus[keyof typeof RoomStatus];
 
-// Interface của Room
+// Interface của Room chuẩn theo Backend API (GET)
 interface Room {
   id: string;
-  createdAt?: string;
-  updatedAt?: string;
+  createdAt: string;
+  updatedAt: string;
   roomNumber: string;
   price: number;
   area: number;
   maxOccupants: number;
-  description?: string;
+  description: string;
   roomDeposit: number;
   floorNumber: number;
   status: RoomStatus;
-  statusName?: string;
-  tenantName?: string | null;
+  statusLabel: string; // Đổi từ statusName -> statusLabel theo backend
+  tenantName: string | null;
 }
 
 // Interface của Floor
@@ -65,13 +65,13 @@ export default function RoomManagement() {
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [roomToDelete, setRoomToDelete] = useState<string | null>(null);
 
-  // State quản lý Form phòng (Thêm / Sửa)
+  // State quản lý Form phòng (Thêm / Sửa) - Gửi lên theo cấu trúc body của API POST/PUT
   const [roomFormData, setRoomFormData] = useState({
     roomNumber: '',
     price: 0,
     area: 0,
     maxOccupants: 2,
-    roomDeposit: 0,
+    roomDeposit: 0, // Backend nhận thuộc tính này, giữ nguyên để gửi lên
     floorId: '',
     description: ''
   });
@@ -120,7 +120,7 @@ export default function RoomManagement() {
     fetchData();
   }, []);
 
-  //Hàm POST: Xử lý Thêm phòng mới
+  // Hàm POST: Xử lý Thêm phòng mới
   const handleCreateRoom = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!roomFormData.floorId) {
@@ -128,11 +128,10 @@ export default function RoomManagement() {
       return;
     }
     try {
-      const { roomDeposit, ...postPayload } = roomFormData;
-
+      // Giữ nguyên toàn bộ roomFormData (bao gồm roomDeposit) gửi lên Backend
       const response = await fetchApi('/Rooms', {
         method: 'POST',
-        body: JSON.stringify(postPayload),
+        body: JSON.stringify(roomFormData),
       });
 
       if (response.ok) {
@@ -161,11 +160,10 @@ export default function RoomManagement() {
     }
 
     try {
-      const { roomDeposit, ...putPayload } = roomFormData;
-
+      // Giữ nguyên toàn bộ roomFormData (bao gồm roomDeposit) gửi lên Backend
       const response = await fetchApi(`/Rooms/${selectedRoom.id}`, {
         method: 'PUT',
-        body: JSON.stringify(putPayload),
+        body: JSON.stringify(roomFormData),
       });
 
       if (response.ok) {
@@ -252,7 +250,6 @@ export default function RoomManagement() {
 
   const openEditModal = (room: Room) => {
     setSelectedRoom(room);
-    // Khớp floorNumber kiểu số của phòng với floorNumber của danh sách Tầng để tìm floorId chuẩn xác
     const matchedFloor = floors.find(f => f.floorNumber === room.floorNumber);
     setRoomFormData({
       roomNumber: room.roomNumber,
@@ -286,20 +283,23 @@ export default function RoomManagement() {
     return matchesSearch && matchesFilter;
   });
 
-  const getStatusBadge = (status: RoomStatus) => {
+  const getStatusBadge = (status: RoomStatus, label?: string) => {
     const styles = {
       [RoomStatus.Vacant]: 'bg-green-100 text-green-700',
       [RoomStatus.Occupied]: 'bg-blue-100 text-blue-700',
       [RoomStatus.Maintenance]: 'bg-orange-100 text-orange-700',
     };
-    const labels = {
+    
+    // Sử dụng label trả về từ API backend, fallback về text cứng nếu trống
+    const defaultLabels = {
       [RoomStatus.Vacant]: 'Trống',
       [RoomStatus.Occupied]: 'Đã thuê',
       [RoomStatus.Maintenance]: 'Bảo trì',
     };
+
     return (
       <span className={`px-3 py-1 rounded-full text-sm font-medium ${styles[status]}`}>
-        {labels[status]}
+        {label || defaultLabels[status]}
       </span>
     );
   };
@@ -382,7 +382,7 @@ export default function RoomManagement() {
                     Mã tầng: {floors.find(f => f.floorNumber === room.floorNumber)?.name || `Tầng ${room.floorNumber}`}
                   </p>
                 </div>
-                {getStatusBadge(room.status)}
+                {getStatusBadge(room.status, room.statusLabel)}
               </div>
 
               <div className="space-y-2 mb-4">
@@ -625,7 +625,7 @@ export default function RoomManagement() {
         </Dialog.Portal>
       </Dialog.Root>
 
-      {/* Dialog Xác nhận xóa tài khoản */}
+      {/* Dialog Xác nhận xóa phòng */}
       <Dialog.Root open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
         <Dialog.Portal>
           <Dialog.Overlay className="fixed inset-0 bg-black/50 animate-fade-in" />
