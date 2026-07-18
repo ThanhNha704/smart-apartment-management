@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { Plus, Search, Edit, Trash2, Users, DoorOpen, Loader2 } from 'lucide-react';
 import * as Dialog from '@radix-ui/react-dialog';
 import { toast } from 'sonner';
-import { fetchApi } from '../../utils/api'; 
+import { fetchApi } from '../../utils/api';
 
 // Định nghĩa trạng thái phòng
 const RoomStatus = {
@@ -13,7 +13,7 @@ const RoomStatus = {
 
 type RoomStatus = typeof RoomStatus[keyof typeof RoomStatus];
 
-// Interface của Room chuẩn theo Backend API (GET)
+// Interface
 interface Room {
   id: string;
   createdAt: string;
@@ -26,7 +26,7 @@ interface Room {
   roomDeposit: number;
   floorNumber: number;
   status: RoomStatus;
-  statusLabel: string; // Đổi từ statusName -> statusLabel theo backend
+  statusLabel: string;
   tenantName: string | null;
 }
 
@@ -65,13 +65,13 @@ export default function RoomManagement() {
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [roomToDelete, setRoomToDelete] = useState<string | null>(null);
 
-  // State quản lý Form phòng (Thêm / Sửa) - Gửi lên theo cấu trúc body của API POST/PUT
+  // State quản lý Form phòng (Thêm / Sửa)
   const [roomFormData, setRoomFormData] = useState({
     roomNumber: '',
     price: 0,
     area: 0,
     maxOccupants: 2,
-    roomDeposit: 0, // Backend nhận thuộc tính này, giữ nguyên để gửi lên
+    roomDeposit: 0,
     floorId: '',
     description: ''
   });
@@ -83,7 +83,7 @@ export default function RoomManagement() {
     startDate: '',
     endDate: '',
     paymentDate: 5,
-    monthlyRent: 0
+    price: 0
   });
 
   // Hàm GET: Lấy tất cả dữ liệu cần thiết
@@ -91,19 +91,16 @@ export default function RoomManagement() {
     try {
       setLoading(true);
 
-      // Fetch danh sách phòng
       const roomsRes = await fetchApi('/Rooms');
       if (!roomsRes.ok) throw new Error('Không thể tải danh sách phòng');
       const roomsData = await roomsRes.json();
       setRooms(roomsData);
 
-      // Fetch danh sách tầng để chọn
       const floorsRes = await fetchApi('/Floors');
       if (!floorsRes.ok) throw new Error('Không thể tải danh sách tầng');
       const floorsData = await floorsRes.json();
       setFloors(floorsData.floors || []);
 
-      // Fetch danh sách người dùng
       const usersRes = await fetchApi('/Users');
       if (!usersRes.ok) throw new Error('Không thể tải danh sách khách hàng');
       const usersData = await usersRes.json();
@@ -128,7 +125,6 @@ export default function RoomManagement() {
       return;
     }
     try {
-      // Giữ nguyên toàn bộ roomFormData (bao gồm roomDeposit) gửi lên Backend
       const response = await fetchApi('/Rooms', {
         method: 'POST',
         body: JSON.stringify(roomFormData),
@@ -150,7 +146,7 @@ export default function RoomManagement() {
     }
   };
 
-  // Hàm PUT: Xử lý Sửa thông tin phòng (/Rooms/{id})
+  // Hàm PUT: Xử lý Sửa thông tin phòng
   const handleSaveEdit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedRoom) return;
@@ -160,7 +156,6 @@ export default function RoomManagement() {
     }
 
     try {
-      // Giữ nguyên toàn bộ roomFormData (bao gồm roomDeposit) gửi lên Backend
       const response = await fetchApi(`/Rooms/${selectedRoom.id}`, {
         method: 'PUT',
         body: JSON.stringify(roomFormData),
@@ -182,7 +177,7 @@ export default function RoomManagement() {
     }
   };
 
-  // Hàm POST: Xử lý Lập hợp đồng & Cho thuê phòng (/Contracts)
+  // Hàm POST: Xử lý Lập hợp đồng & Cho thuê phòng
   const handleSaveRent = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedRoom) return;
@@ -201,7 +196,7 @@ export default function RoomManagement() {
           startDate: contractFormData.startDate,
           endDate: contractFormData.endDate,
           paymentDate: contractFormData.paymentDate,
-          monthlyRent: contractFormData.monthlyRent
+          price: contractFormData.price
         }),
       });
 
@@ -271,7 +266,7 @@ export default function RoomManagement() {
       startDate: new Date().toISOString().split('T')[0],
       endDate: '',
       paymentDate: 5,
-      monthlyRent: room.price
+      price: room.price
     });
     setIsRentDialogOpen(true);
   };
@@ -289,8 +284,7 @@ export default function RoomManagement() {
       [RoomStatus.Occupied]: 'bg-blue-100 text-blue-700',
       [RoomStatus.Maintenance]: 'bg-orange-100 text-orange-700',
     };
-    
-    // Sử dụng label trả về từ API backend, fallback về text cứng nếu trống
+
     const defaultLabels = {
       [RoomStatus.Vacant]: 'Trống',
       [RoomStatus.Occupied]: 'Đã thuê',
@@ -303,15 +297,6 @@ export default function RoomManagement() {
       </span>
     );
   };
-
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center p-12 text-gray-500">
-        <Loader2 className="w-6 h-6 mr-2 animate-spin" />
-        Đang tải dữ liệu phòng từ hệ thống...
-      </div>
-    );
-  }
 
   return (
     <div className="p-6 max-w-7xl mx-auto">
@@ -365,7 +350,7 @@ export default function RoomManagement() {
         </div>
       </div>
 
-      {/* Trạng thái Loading dữ liệu từ API */}
+      {/* Trạng thái Loading */}
       {loading ? (
         <div className="flex flex-col items-center justify-center py-20 gap-2">
           <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
@@ -374,59 +359,82 @@ export default function RoomManagement() {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {filteredRooms.map((room) => (
-            <div key={room.id} className="bg-white rounded-lg border border-gray-200 p-5 hover:shadow-lg transition-shadow">
-              <div className="flex items-start justify-between mb-4">
-                <div>
-                  <h3 className="text-xl font-semibold mb-1">{room.roomNumber}</h3>
-                  <p className="text-gray-400 text-xs">
-                    Mã tầng: {floors.find(f => f.floorNumber === room.floorNumber)?.name || `Tầng ${room.floorNumber}`}
-                  </p>
-                </div>
-                {getStatusBadge(room.status, room.statusLabel)}
-              </div>
-
-              <div className="space-y-2 mb-4">
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-gray-600">Diện tích / Sức chứa</span>
-                  <span className="font-medium">{room.area}m² - Tối đa {room.maxOccupants} người</span>
-                </div>
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-gray-600">Giá thuê</span>
-                  <span className="font-medium text-blue-600">{room.price.toLocaleString('vi-VN')} ₫</span>
-                </div>
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-gray-600">Tiền đặt cọc</span>
-                  <span className="font-medium">{room.roomDeposit.toLocaleString('vi-VN')} ₫</span>
-                </div>
-                {room.description && (
-                  <p className="text-xs text-gray-500 italic line-clamp-1 border-t pt-1">Ghi chú: {room.description}</p>
-                )}
-                {room.status === RoomStatus.Occupied && room.tenantName && (
-                  <div className="flex items-center gap-2 text-sm pt-2 border-t border-gray-100">
-                    <Users className="w-4 h-4 text-gray-400" />
-                    <span className="text-gray-900 font-medium">Khách thuê: {room.tenantName}</span>
+            <div key={room.id} className="bg-white rounded-lg border border-gray-200 p-5 hover:shadow-lg transition-shadow flex flex-col justify-between h-full">
+              {/* Phần thông tin chính ở trên */}
+              <div>
+                <div className="flex items-start justify-between mb-4">
+                  <div>
+                    <h3 className="text-xl font-semibold mb-1">{room.roomNumber}</h3>
+                    <p className="text-gray-400 text-xs">
+                      {floors.find(f => f.floorNumber === room.floorNumber)?.name || `Tầng ${room.floorNumber}`}
+                    </p>
                   </div>
-                )}
+                  {getStatusBadge(room.status, room.statusLabel)}
+                </div>
+
+                <div className="space-y-2 mb-4">
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-gray-600">Diện tích / Sức chứa</span>
+                    <span className="font-medium">{room.area}m² - Tối đa {room.maxOccupants} người</span>
+                  </div>
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-gray-600">Giá thuê</span>
+                    <span className="font-medium text-blue-600">{room.price.toLocaleString('vi-VN')} ₫</span>
+                  </div>
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-gray-600">Tiền đặt cọc</span>
+                    <span className="font-medium">{room.roomDeposit.toLocaleString('vi-VN')} ₫</span>
+                  </div>
+                </div>
               </div>
 
-              <div className="flex gap-2 pt-4 border-t border-gray-100">
-                <button
-                  onClick={() => openEditModal(room)}
-                  className="flex-1 px-3 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 flex items-center justify-center gap-2 text-sm"
-                >
-                  <Edit className="w-4 h-4" /> Sửa
-                </button>
+              {/* Phần thông tin phụ */}
+              <div className="border-t border-gray-100 pt-2 mb-4 min-h-[56px] flex flex-col justify-center">
+                {room.description ? (
+                  <p className="text-xs text-gray-500 italic line-clamp-1 mb-1">Ghi chú: {room.description}</p>
+                ) : null}
+
+                {room.status === RoomStatus.Occupied && room.tenantName ? (
+                  <div className="flex items-center gap-2 text-sm pt-1">
+                    <Users className="w-4 h-4 text-gray-400" />
+                    <span className="text-gray-900 font-medium line-clamp-1">Khách thuê: {room.tenantName}</span>
+                  </div>
+                ) : null}
+              </div>
+
+              {/* Phần nút chức năng */}
+              <div className="flex gap-2 pt-4 border-t border-gray-100 mt-auto">
                 {room.status === RoomStatus.Vacant ? (
-                  <button
-                    onClick={() => openRentModal(room)}
-                    className="flex-1 px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center justify-center gap-2 text-sm"
-                  >
-                    <DoorOpen className="w-4 h-4" /> Cho thuê
-                  </button>
+                  <>
+                    {/* Nút Cho thuê */}
+                    <button
+                      onClick={() => openRentModal(room)}
+                      className="flex-1 px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center justify-center gap-2 text-sm font-medium"
+                    >
+                      <DoorOpen className="w-4 h-4" /> Cho thuê
+                    </button>
+
+                    {/* Nút Sửa */}
+                    <button
+                      onClick={() => openEditModal(room)}
+                      className="flex-1 px-3 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 flex items-center justify-center gap-2 text-sm font-medium"
+                    >
+                      <Edit className="w-4 h-4" /> Sửa
+                    </button>
+
+                    {/* Nút Xóa */}
+                    <button
+                      onClick={() => openDeleteModal(room.id)}
+                      className="flex-1 px-3 py-2 border border-red-300 text-red-600 rounded-lg hover:bg-red-50 flex items-center justify-center gap-2 text-sm font-medium"
+                    >
+                      <Trash2 className="w-4 h-4" /> Xóa
+                    </button>
+                  </>
                 ) : (
+                  /* Nút Xóa duy nhất (Khi phòng đã được thuê hoặc đang bảo trì) */
                   <button
                     onClick={() => openDeleteModal(room.id)}
-                    className="flex-1 px-3 py-2 border border-red-300 text-red-600 rounded-lg hover:bg-red-50 flex items-center justify-center gap-2 text-sm"
+                    className="flex-1 px-3 py-2 border border-red-300 text-red-600 rounded-lg hover:bg-red-50 flex items-center justify-center gap-2 text-sm font-medium"
                   >
                     <Trash2 className="w-4 h-4" /> Xóa
                   </button>
@@ -436,8 +444,7 @@ export default function RoomManagement() {
           ))}
         </div>
       )}
-
-      {/* Dialog Thêm phòng (POST /api/Rooms) */}
+      {/* Dialog Thêm phòng */}
       <Dialog.Root open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
         <Dialog.Portal>
           <Dialog.Overlay className="fixed inset-0 bg-black/50 animate-fade-in" />
@@ -495,7 +502,7 @@ export default function RoomManagement() {
         </Dialog.Portal>
       </Dialog.Root>
 
-      {/* Dialog Sửa thông tin phòng (PUT /api/Rooms/{id}) */}
+      {/* Dialog Sửa thông tin phòng */}
       <Dialog.Root open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
         <Dialog.Portal>
           <Dialog.Overlay className="fixed inset-0 bg-black/50 animate-fade-in" />
@@ -553,7 +560,7 @@ export default function RoomManagement() {
         </Dialog.Portal>
       </Dialog.Root>
 
-      {/* Dialog Cho thuê phòng (POST /api/Contracts) */}
+      {/* Dialog Cho thuê phòng */}
       <Dialog.Root open={isRentDialogOpen} onOpenChange={setIsRentDialogOpen}>
         <Dialog.Portal>
           <Dialog.Overlay className="fixed inset-0 bg-black/50 animate-fade-in" />
@@ -603,6 +610,17 @@ export default function RoomManagement() {
               <div>
                 <label className="block text-sm font-medium mb-1">Ngày thanh toán định kỳ (hàng tháng)</label>
                 <input type="number" min={1} max={31} value={contractFormData.paymentDate} onChange={(e) => setContractFormData({ ...contractFormData, paymentDate: Number(e.target.value) })} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" required />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1">Tiền thanh toán định kỳ (hàng tháng)</label>
+                <input
+                  type="number"
+                  min={1000}
+                  value={contractFormData.price}
+                  onChange={(e) => setContractFormData({ ...contractFormData, price: Number(e.target.value) })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  required
+                />
               </div>
 
               <div className="p-4 bg-blue-50 rounded-lg">

@@ -4,7 +4,7 @@ import * as Dialog from '@radix-ui/react-dialog';
 import { toast } from 'sonner';
 import { fetchApi } from '../../utils/api';
 
-// Interface chuẩn hóa theo đúng dữ liệu trả về của API GET /api/Users công bố trên Swagger
+// Interface
 interface UserTenant {
   id: string;
   name: string;
@@ -19,10 +19,10 @@ interface UserTenant {
   role: string;
 }
 
-// Cấu trúc Form chuẩn hóa 100% theo Request Body của POST và PUT trong Swagger
+// Cấu trúc Form
 const blankTenantFormData = {
   name: '',
-  password: '', // Chỉ dùng cho POST/PUT để khởi tạo/thay đổi mật khẩu
+  password: '',
   email: '',
   phoneNumber: '',
   idCard: '',
@@ -100,7 +100,7 @@ export default function TenantManagement() {
     }
   };
 
-  // Mở modal chỉnh sửa và đổ dữ liệu
+  // Mở modal chỉnh sửa
   const openEditModal = (tenant: UserTenant) => {
     setSelectedTenantId(tenant.id);
 
@@ -111,7 +111,7 @@ export default function TenantManagement() {
 
     setFormData({
       name: tenant.name,
-      password: '', // Password không được trả về ở GET nên để trống để điền nếu muốn đổi
+      password: '',
       email: tenant.email,
       phoneNumber: tenant.phoneNumber,
       idCard: tenant.idCard || '',
@@ -134,7 +134,7 @@ export default function TenantManagement() {
 
       const response = await fetchApi(`/Users/${selectedTenantId}`, {
         method: 'PUT',
-        body: JSON.stringify(payload), // Body gửi đi sạch sẽ chỉ chứa schema thay đổi
+        body: JSON.stringify(payload),
       });
 
       if (response.ok) {
@@ -153,7 +153,7 @@ export default function TenantManagement() {
     }
   };
 
-  // Xử lý Xóa tài khoản (DELETE /api/Users/{id})
+  // Xử lý Xóa tài khoản
   const confirmDeleteTenant = async () => {
     if (!tenantToDelete) return;
     try {
@@ -184,10 +184,16 @@ export default function TenantManagement() {
     if (!dateStr) return 'Chưa cập nhật';
 
     try {
-      const date = new Date(dateStr);
-      if (isNaN(date.getTime())) return dateStr; // Chuỗi không hợp lệ thì trả về nguyên bản
+      // Tách chuỗi bằng khoảng trắng để lấy phần đầu tiên
+      const firstPart = dateStr.trim().split(' ')[0]; // Kết quả sẽ là '16/07/2026' hoặc '2000-03-19'
 
-      // Ép hiển thị theo cấu trúc ngày/tháng/năm bằng cách thủ công hoặc toLocaleDateString
+      // Nếu chuỗi trả về chứa chữ 'T'
+      const onlyDate = firstPart.includes('T') ? firstPart.split('T')[0] : firstPart;
+
+      // Nếu không rơi vào các trường hợp trên
+      const date = new Date(dateStr);
+      if (isNaN(date.getTime())) return onlyDate;
+
       const day = String(date.getDate()).padStart(2, '0');
       const month = String(date.getMonth() + 1).padStart(2, '0');
       const year = date.getFullYear();
@@ -204,8 +210,6 @@ export default function TenantManagement() {
     tenant.idCard?.includes(searchTerm) ||
     tenant.email?.toLowerCase().includes(searchTerm.toLowerCase())
   );
-
-  // UI Code giữ nguyên ở dưới...
 
   return (
     <div className="p-6 max-w-7xl mx-auto">
@@ -455,7 +459,7 @@ export default function TenantManagement() {
                 <div>
                   <label className="block text-sm font-medium mb-1">Ngày sinh <span className="text-red-500">*</span></label>
                   <input
-                    type="date" 
+                    type="date"
                     required
                     value={formData.dateOfBirth}
                     onChange={(e) => setFormData({ ...formData, dateOfBirth: e.target.value })}
@@ -503,7 +507,7 @@ export default function TenantManagement() {
         </Dialog.Portal>
       </Dialog.Root>
 
-      {/* DIALOG XÁC NHẬN XÓA (HỎI TRƯỚC KHI XÓA) */}
+      {/* DIALOG XÁC NHẬN XÓA */}
       <Dialog.Root open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
         <Dialog.Portal>
           <Dialog.Overlay className="fixed inset-0 bg-black/50 z-50 transition-opacity" />

@@ -34,7 +34,7 @@ const menuItems = [
   { path: '/maintenance', icon: Wrench, label: 'Yêu cầu sửa chữa' },
   { path: '/messages', icon: MessageCircleMore, label: 'Tin nhắn' },
   { path: '/notification', icon: Bell, label: 'Thông báo' },
-  { path: '/settings', icon: SettingsIcon, label: 'Cài đặt' },
+  // { path: '/settings', icon: SettingsIcon, label: 'Cài đặt' },
 ];
 
 export default function Sidebar({ open, onToggle }: SidebarProps) {

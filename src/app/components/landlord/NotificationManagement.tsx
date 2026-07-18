@@ -1,23 +1,23 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom'; // Chuyển trang
-import { 
-  Bell, 
-  BellRing, 
-  Check, 
-  CheckCheck, 
-  Loader2, 
-  Send, 
-  Search, 
-  Plus, 
+import { useNavigate } from 'react-router-dom';
+import {
+  Bell,
+  BellRing,
+  Check,
+  CheckCheck,
+  Loader2,
+  Send,
+  Search,
+  Plus,
   X,
   Volume2,
   Inbox,
-  MessageSquare // Icon tin nhắn trực quan
+  MessageSquare
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { fetchApi } from '../../utils/api';
 
-// INTERFACES khớp hoàn toàn với Backend Swagger
+// INTERFACES
 interface NotificationItem {
   id: string;
   tenantId: string | null;
@@ -32,26 +32,26 @@ interface NotificationItem {
 }
 
 export default function NotificationManagement() {
-  const navigate = useNavigate(); // Hook điều hướng chuyển trang
+  const navigate = useNavigate();
   const [users, setUsers] = useState<{ id: string; name: string }[]>([]);
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
-  
+
   // Bộ lọc & Phân trang
   const [page, setPage] = useState(1);
   const [pageSize] = useState(20);
   const [isReadFilter, setIsReadFilter] = useState<boolean | null>(null); // null: Tất cả, true: Đã đọc, false: Chưa đọc
   const [searchQuery, setSearchQuery] = useState('');
 
-  // States Thống kê số lượng thông báo nhanh
+  // Thống kê số lượng thông báo
   const [stats, setStats] = useState({ total: 0, unread: 0, read: 0 });
 
-  // Dialog Form Gửi Thông báo
+  // Form Gửi Thông báo
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [tenantId, setTenantId] = useState('');
   const [title, setTitle] = useState('');
   const [body, setBody] = useState('');
   const [type, setType] = useState<number>(0);
-  const [refModel, setRefModel] = useState(''); // Giá trị select liên kết tính năng
+  const [refModel, setRefModel] = useState('');
   const [metaKey, setMetaKey] = useState('');
   const [metaValue, setMetaValue] = useState('');
 
@@ -79,7 +79,7 @@ export default function NotificationManagement() {
         }
         setNotifications(items);
 
-        // Tính toán nhanh số liệu thống kê ở client
+        // Tính toán nhanh số liệu thống kê
         const unreadCount = items.filter(n => !n.isRead).length;
         setStats({
           total: items.length,
@@ -123,8 +123,8 @@ export default function NotificationManagement() {
 
     try {
       setIsSending(true);
-      
-      // Khởi tạo meta object khớp Swagger
+
+      // Khởi tạo meta object
       const metaObj: Record<string, string> = {};
       if (metaKey.trim() && metaValue.trim()) {
         metaObj[metaKey.trim()] = metaValue.trim();
@@ -135,7 +135,7 @@ export default function NotificationManagement() {
         title: title.trim(),
         body: body.trim(),
         type: type,
-        refId: null, // Đã loại bỏ phần nhập ID, gán cứng null lên backend
+        refId: null,
         refModel: refModel.trim() || null,
         meta: metaObj
       };
@@ -171,7 +171,7 @@ export default function NotificationManagement() {
     }
   };
 
-  // PUT: Đánh dấu đã đọc một thông báo cụ thể
+  // PUT: Đánh dấu đã đọc một thông báo
   const handleMarkAsRead = async (id: string, silent = false) => {
     try {
       const response = await fetchApi(`/Notification/mark-read/${id}`, {
@@ -189,7 +189,7 @@ export default function NotificationManagement() {
     }
   };
 
-  // PUT: Đánh dấu đã đọc TẤT CẢ thông báo
+  // PUT: Đánh dấu đã đọc all
   const handleMarkAllAsRead = async () => {
     try {
       const response = await fetchApi('/Notification/mark-all-read', {
@@ -216,11 +216,11 @@ export default function NotificationManagement() {
     switch (model) {
       case 'message':
       case 'chat':
-        navigate('/messages'); 
-        toast.info('Đang chuyển hướng tới hộp thoại tin nhắn...');
+        navigate('/messages');
+        // toast.info('Đang chuyển hướng tới tin nhắn...');
         break;
       case 'bill':
-        navigate('/bills');
+        navigate('/invoices');
         break;
       case 'issue':
       case 'maintenance':
@@ -238,15 +238,15 @@ export default function NotificationManagement() {
     }
   };
 
-  // Filter tìm kiếm client-side theo tiêu đề/nội dung
-  const filteredNotifications = notifications.filter(n => 
-    n.title.toLowerCase().includes(searchQuery.toLowerCase()) || 
+  // Filter tìm kiếm
+  const filteredNotifications = notifications.filter(n =>
+    n.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
     n.body.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   return (
     <div className="p-6 max-w-7xl mx-auto space-y-6">
-      
+
       {/* HEADER SECTION */}
       <div className="flex justify-between items-start">
         <div>
@@ -334,17 +334,15 @@ export default function NotificationManagement() {
             <div
               key={notif.id}
               onClick={() => handleNotificationClick(notif)} // Click vào thẻ để kích hoạt chuyển hướng
-              className={`bg-white p-5 rounded-xl border transition-all hover:shadow-md cursor-pointer flex flex-col md:flex-row justify-between items-start md:items-center gap-4 ${
-                !notif.isRead ? 'border-l-4 border-l-blue-500 border-gray-200' : 'border-gray-100'
-              }`}
+              className={`bg-white p-5 rounded-xl border transition-all hover:shadow-md cursor-pointer flex flex-col md:flex-row justify-between items-start md:items-center gap-4 ${!notif.isRead ? 'border-l-4 border-l-blue-500 border-gray-200' : 'border-gray-100'
+                }`}
             >
               {/* Thẻ bên trái chứa nội dung chính */}
               <div className="flex items-start gap-4 flex-1">
-                <div className={`p-2.5 rounded-lg ${
-                  notif.refModel?.toLowerCase() === 'message' 
+                <div className={`p-2.5 rounded-lg ${notif.refModel?.toLowerCase() === 'message'
                     ? 'bg-purple-50 text-purple-600' // Đổi sang màu tím nếu là tin nhắn
                     : !notif.isRead ? 'bg-blue-50 text-blue-600' : 'bg-gray-100 text-gray-400'
-                }`}>
+                  }`}>
                   {notif.refModel?.toLowerCase() === 'message' ? (
                     <MessageSquare className="w-5 h-5" />
                   ) : (
@@ -354,19 +352,17 @@ export default function NotificationManagement() {
                 <div>
                   <div className="flex items-center gap-2 mb-1.5 flex-wrap">
                     <span className="text-xs font-semibold text-gray-400">#{notif.id.substring(0, 8).toUpperCase()}</span>
-                    
+
                     {/* Loại thông báo */}
-                    <span className={`text-[10px] px-2.5 py-0.5 rounded-full font-medium ${
-                      notif.type === 0 ? 'bg-gray-100 text-gray-600' :
-                      notif.type === 1 ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'
-                    }`}>
+                    <span className={`text-[10px] px-2.5 py-0.5 rounded-full font-medium ${notif.type === 0 ? 'bg-gray-100 text-gray-600' :
+                        notif.type === 1 ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'
+                      }`}>
                       {notif.type === 0 ? 'Hệ thống' : notif.type === 1 ? 'Hóa đơn' : 'Sự cố'}
                     </span>
 
                     {/* Trạng thái Đã đọc / Chưa đọc */}
-                    <span className={`text-[10px] px-2.5 py-0.5 rounded-full font-medium ${
-                      notif.isRead ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'
-                    }`}>
+                    <span className={`text-[10px] px-2.5 py-0.5 rounded-full font-medium ${notif.isRead ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'
+                      }`}>
                       {notif.isRead ? 'Đã đọc' : 'Chưa đọc'}
                     </span>
 
@@ -393,10 +389,10 @@ export default function NotificationManagement() {
                 </div>
               </div>
 
-              {/* Nhóm hành động bên phải (BỎ NÚT MẮT XEM METADATA) */}
-              <div 
+              {/* Nhóm hành động bên phải */}
+              <div
                 className="flex items-center gap-2 w-full md:w-auto border-t md:border-t-0 pt-3 md:pt-0 justify-end"
-                onClick={(e) => e.stopPropagation()} // Ngăn nổi bọt để tránh kích hoạt click chuyển trang
+                onClick={(e) => e.stopPropagation()}
               >
                 {!notif.isRead && (
                   <button
@@ -441,7 +437,7 @@ export default function NotificationManagement() {
                 <BellRing className="w-5 h-5 text-blue-600" />
                 Soạn tin nhắn thông báo mới
               </h3>
-              <button 
+              <button
                 onClick={() => setIsFormOpen(false)}
                 className="p-1.5 hover:bg-gray-200 rounded-full transition-colors"
               >

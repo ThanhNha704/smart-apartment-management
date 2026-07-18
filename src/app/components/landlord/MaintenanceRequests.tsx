@@ -4,7 +4,7 @@ import * as Dialog from '@radix-ui/react-dialog';
 import { toast } from 'sonner';
 import { fetchApi } from '../../utils/api';
 
-// INTERFACES DỮ LIỆU ĐÃ CHUẨN BACKEND (GIỮ NGUYÊN VÌ ĐÃ ĐÚNG SWAGGER)
+// INTERFACES
 interface MaintenanceItem {
   id: string;
   requestNumber: string;
@@ -32,15 +32,15 @@ export default function MaintenanceRequests() {
   const [isLoading, setIsLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState<string>('all');
-  const [filterPriority, setFilterPriority] = useState<string>('all'); // 🟢 THÊM MỚI: Khởi tạo state lọc độ ưu tiên
+  const [filterPriority, setFilterPriority] = useState<string>('all');
   const [selectedRequest, setSelectedRequest] = useState<MaintenanceItem | null>(null);
 
-  // Hàm GET: Lấy dữ liệu (Cập nhật đường dẫn chuẩn /api/...)
+  // Hàm GET: Lấy dữ liệu 
   const fetchRequests = async () => {
     try {
       setIsLoading(true);
       const response = await fetchApi('/MaintenanceRequests');
-      
+
       if (!response.ok) throw new Error('Không thể tải dữ liệu');
 
       const data: ApiResponse = await response.json();
@@ -57,7 +57,7 @@ export default function MaintenanceRequests() {
     fetchRequests();
   }, []);
 
-  // Hàm PUT: Bắt đầu xử lý (Cập nhật đường dẫn chuẩn /api/...)
+  // Hàm PUT: Bắt đầu xử lý
   const handleStartProcess = async (id: string) => {
     try {
       const response = await fetchApi(`/MaintenanceRequests/${id}/start`, {
@@ -77,7 +77,7 @@ export default function MaintenanceRequests() {
     }
   };
 
-  // Hàm PUT: Hoàn thành xử lý (Cập nhật đường dẫn chuẩn /...)
+  // Hàm PUT: Hoàn thành xử lý
   const handleCompleteProcess = async (id: string) => {
     try {
       const response = await fetchApi(`/MaintenanceRequests/${id}/complete`, {
@@ -97,27 +97,26 @@ export default function MaintenanceRequests() {
     }
   };
 
-  // Lọc dữ liệu chuẩn xác từ mảng items bên trong apiData
+  // Lọc dữ liệu
   const items = apiData?.items || [];
   const filteredRequests = items.filter(request => {
     const matchesSearch = (request.requestNumber || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
       (request.tenantName || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
       (request.roomNumber || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
       (request.title || '').toLowerCase().includes(searchTerm.toLowerCase());
-    
+
     const matchesFilter = filterStatus === 'all' || String(request.status) === filterStatus;
-    
-    // 🟢 THÊM MỚI: Logic lọc theo độ ưu tiên
+
     const matchesPriority = filterPriority === 'all' || String(request.priority) === filterPriority;
-    
+
     return matchesSearch && matchesFilter && matchesPriority;
   });
 
   const getStatusBadge = (status: number, label: string) => {
     const configs = {
-      0: { icon: Clock, className: 'bg-yellow-100 text-yellow-700' }, 
-      1: { icon: Wrench, className: 'bg-blue-100 text-blue-700' }, 
-      2: { icon: CheckCircle, className: 'bg-green-100 text-green-700' }, 
+      0: { icon: Clock, className: 'bg-yellow-100 text-yellow-700' },
+      1: { icon: Wrench, className: 'bg-blue-100 text-blue-700' },
+      2: { icon: CheckCircle, className: 'bg-green-100 text-green-700' },
     };
     const config = configs[status as keyof typeof configs] || { icon: Clock, className: 'bg-gray-100 text-gray-700' };
     const Icon = config.icon;
@@ -151,7 +150,7 @@ export default function MaintenanceRequests() {
         <p className="text-gray-600">Xử lý các yêu cầu sửa chữa cơ sở vật chất thời gian thực</p>
       </div>
 
-      {/* Khối thống kê Counter tự động đồng bộ từ API */}
+      {/* Khối thống kê */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
         <div className="bg-white p-4 rounded-lg border border-gray-200">
           <p className="text-gray-600 text-sm mb-1">Tổng yêu cầu</p>
@@ -184,7 +183,7 @@ export default function MaintenanceRequests() {
               className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
           </div>
-          
+
           {/* Bộ lọc trạng thái */}
           <select
             value={filterStatus}
@@ -197,7 +196,7 @@ export default function MaintenanceRequests() {
             <option value="2">Hoàn thành</option>
           </select>
 
-          {/* 🟢 THÊM MỚI: Bộ lọc độ ưu tiên */}
+          {/* Bộ lọc độ ưu tiên */}
           <select
             value={filterPriority}
             onChange={(e) => setFilterPriority(e.target.value)}
@@ -276,7 +275,7 @@ export default function MaintenanceRequests() {
         )}
       </div>
 
-      {/* Modal Popup Chi tiết yêu cầu */}
+      {/* Modal Chi tiết yêu cầu */}
       <Dialog.Root open={selectedRequest !== null} onOpenChange={(open) => !open && setSelectedRequest(null)}>
         <Dialog.Portal>
           <Dialog.Overlay className="fixed inset-0 bg-black/50" />

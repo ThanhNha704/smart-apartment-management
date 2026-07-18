@@ -31,7 +31,19 @@ export default function ChatManagement() {
     const CURRENT_USER_ID = user?.id || "";
 
     const [users, setUsers] = useState<UserOption[]>([]);
-    const [activeUser, setActiveUser] = useState<UserOption | null>(null);
+
+    const [activeUser, setActiveUser] = useState<UserOption | null>(() => {
+        const saved = localStorage.getItem('active_chat_user_id');
+        if (saved) {
+            try {
+                return JSON.parse(saved);
+            } catch {
+                return null;
+            }
+        }
+        return null;
+    });
+
     const [messages, setMessages] = useState<Message[]>([]);
     const [searchUser, setSearchUser] = useState('');
 
@@ -83,7 +95,6 @@ export default function ChatManagement() {
                                 if (history.length > 0) {
                                     const lastMsg = history[0];
                                     const isUnread = lastMsg.senderRole !== 'Admin' && !lastMsg.isRead;
-
                                     return {
                                         ...u,
                                         lastMessage: lastMsg,
@@ -100,12 +111,13 @@ export default function ChatManagement() {
 
                 setUsers(enrichedUsers);
 
-                // GIỮ TRẠNG THÁI CHAT KHI F5
-                const savedActiveUserId = localStorage.getItem('active_chat_user_id');
-                if (savedActiveUserId) {
-                    const foundUser = enrichedUsers.find(u => u.id === savedActiveUserId);
-                    if (foundUser) {
-                        setActiveUser(foundUser);
+                // Cập nhật lại thông tin mới nhất của activeUser nếu nó đã tồn tại trong danh sách mới
+                const savedData = localStorage.getItem('active_chat_user_id');
+                if (savedData) {
+                    const savedParsed = JSON.parse(savedData) as UserOption;
+                    const latestActiveUser = enrichedUsers.find(u => u.id === savedParsed.id);
+                    if (latestActiveUser) {
+                        setActiveUser(latestActiveUser);
                     }
                 }
             }
@@ -156,20 +168,22 @@ export default function ChatManagement() {
         }
     };
 
+    // Chỉ theo dõi `activeUser?.id` thay vì toàn bộ object để tránh re-render lặp vô tận khi object đổi tham chiếu
     useEffect(() => {
-        if (activeUser) {
-            // GIỮ TRẠNG THÁI CHAT KHI F5
-            localStorage.setItem('active_chat_user_id', activeUser.id);
+        if (activeUser?.id) {
+            localStorage.setItem('active_chat_user_id', JSON.stringify(activeUser));
             fetchConversation(activeUser.id);
         } else {
             setMessages([]);
         }
-    }, [activeUser]);
+        return () => {
+            localStorage.removeItem('active_chat_user_id');
+        };
+    }, [activeUser?.id]);
 
     // Hàm xử lý khi bấm nút đóng/quay lại cuộc trò chuyện
     const handleCloseChat = () => {
         setActiveUser(null);
-        // Xóa ID khỏi bộ nhớ khi chủ động đóng chat
         localStorage.removeItem('active_chat_user_id');
     };
 
@@ -334,7 +348,6 @@ export default function ChatManagement() {
                                             </p>
                                         </div>
 
-                                        {/* Dấu hiệu có tin nhắn mới */}
                                         {hasUnread && (
                                             <div className="w-2.5 h-2.5 rounded-full bg-blue-600 shrink-0 absolute right-4 top-1/2 -translate-y-1/2 shadow-sm animate-pulse" />
                                         )}
@@ -351,18 +364,14 @@ export default function ChatManagement() {
                         <>
                             {/* Header khung chat */}
                             <div className="bg-white border-b border-gray-200 px-4 py-3 flex items-center gap-3">
-                                {/* Sử dụng hàm handleCloseChat để xóa lịch sử lưu F5 khi thoát chat */}
                                 <button onClick={handleCloseChat} className="p-1 hover:bg-gray-100 rounded-lg">
                                     <ArrowLeft className="w-5 h-5 text-gray-600" />
                                 </button>
                                 <div className="w-9 h-9 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center font-bold">
-                                    {activeUser.name.charAt(0).toUpperCase()}
+                                    {activeUser.name ? activeUser.name.charAt(0).toUpperCase() : "?"}
                                 </div>
                                 <div>
                                     <h3 className="font-semibold text-sm text-gray-900">{activeUser.name}</h3>
-                                    {/* <p className="text-[10px] text-green-600 flex items-center gap-1">
-                                        <span className="w-1.5 h-1.5 rounded-full bg-green-500 inline-block"></span> Đang trực tuyến
-                                    </p> */}
                                 </div>
                             </div>
 
@@ -379,7 +388,7 @@ export default function ChatManagement() {
                                     </div>
                                 ) : (
                                     messages.map((msg, index) => {
-                                        const messageId = msg.id || "";
+                                        const messageId = msg.id || `msg-${index}`;
                                         const isMe = msg.senderRole === 'Admin' || msg.senderId === CURRENT_USER_ID;
 
                                         const currentMsgDate = new Date(msg.createdAt).toDateString();
@@ -399,47 +408,71 @@ export default function ChatManagement() {
                                                 )}
 
                                                 <div className={`flex ${isMe ? 'justify-end' : 'justify-start'}`}>
-                                                    <div className={`max-w-[70%] rounded-2xl px-4 py-2.5 text-sm shadow-sm ${isMe ? 'bg-blue-500 text-white rounded-br-none' : 'bg-white text-gray-900 rounded-bl-none border border-gray-100'
-                                                        }`}>
-                                                        {msg.content && <p className="leading-relaxed break-words">{msg.content}</p>}
+                                                    <div className={`flex w-full ${isMe ? 'justify-end' : 'justify-start'}`}>
+                                                        {/* So sánh không phân biệt hoa thường bằng toLowerCase() */}
+                                                        {msg.type?.toLowerCase() === "image" && msg.imageUrl ? (
 
-                                                        {msg.type === "Image" && msg.imageUrl && (
-                                                            <div className="relative mt-2 rounded-lg overflow-hidden border border-black/10 group/img">
-                                                                <img
-                                                                    src={msg.imageUrl}
-                                                                    alt="Hình ảnh trò chuyện"
-                                                                    className="max-h-60 max-w-full object-cover rounded-lg"
-                                                                />
-                                                                <button
-                                                                    type="button"
-                                                                    onClick={() => handleDownloadImage(msg.imageUrl!)}
-                                                                    className="absolute top-2 right-2 bg-black/60 hover:bg-black/80 text-white p-1.5 rounded-full opacity-0 group-hover/img:opacity-100 transition-opacity"
-                                                                    title="Lưu ảnh về máy"
-                                                                >
-                                                                    <Download className="w-4 h-4" />
-                                                                </button>
-                                                            </div>
-                                                        )}
+                                                            // Layout ảnh
+                                                            <div className="max-w-[70%] flex flex-col group/img my-1">
+                                                                <div className="relative rounded-2xl overflow-hidden border border-black/5 shadow-sm bg-gray-100">
+                                                                    <img
+                                                                        src={msg.imageUrl}
+                                                                        alt="Hình ảnh trò chuyện"
+                                                                        className="max-h-72 max-w-full object-cover block"
+                                                                    />
+                                                                    <button
+                                                                        type="button"
+                                                                        onClick={() => handleDownloadImage(msg.imageUrl!)}
+                                                                        className="absolute top-2 right-2 bg-black/60 hover:bg-black/80 text-white p-1.5 rounded-full opacity-0 group-hover/img:opacity-100 transition-opacity"
+                                                                        title="Lưu ảnh về máy"
+                                                                    >
+                                                                        <Download className="w-4 h-4" />
+                                                                    </button>
+                                                                </div>
 
-                                                        <div className={`flex items-center justify-end gap-1 mt-1 text-[9px] ${isMe ? 'text-blue-200' : 'text-gray-400'}`}>
-                                                            <span>{new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
-
-                                                            {isMe && (
-                                                                <div className="flex items-center gap-0.5 ml-1" title={msg.isRead ? "Người thuê đã xem" : "Tin nhắn đã gửi thành công"}>
-                                                                    {msg.isRead ? (
-                                                                        <>
-                                                                            <span className="font-medium text-blue-100">Đã xem</span>
-                                                                            <CheckCheck className="w-3 h-3 text-cyan-200 stroke-[2.5]" />
-                                                                        </>
-                                                                    ) : (
-                                                                        <>
-                                                                            <span className="text-blue-300">Đã gửi</span>
-                                                                            <Check className="w-3 h-3 text-blue-300 stroke-[2.5]" />
-                                                                        </>
+                                                                {/* Thời gian dưới ảnh */}
+                                                                <div className="flex items-center justify-end gap-1 mt-1 text-[10px] text-gray-400 px-1">
+                                                                    <span>{new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                                                                    {isMe && (
+                                                                        <div className="flex items-center gap-0.5 ml-1">
+                                                                            {msg.isRead ? (
+                                                                                <CheckCheck className="w-3 h-3 text-blue-500 stroke-[2.5]" />
+                                                                            ) : (
+                                                                                <Check className="w-3 h-3 text-gray-400 stroke-[2.5]" />
+                                                                            )}
+                                                                        </div>
                                                                     )}
                                                                 </div>
-                                                            )}
-                                                        </div>
+                                                            </div>
+
+                                                        ) : (
+
+                                                            // Layout chữ
+                                                            <div className={`flex flex-col max-w-[70%] my-1 ${isMe ? 'items-end' : 'items-start'}`}>
+                                                                <div className={`rounded-2xl px-4 py-2.5 text-sm shadow-sm min-w-[60px] w-auto inline-block ${isMe ? 'bg-blue-500 text-white rounded-br-none' : 'bg-white text-gray-900 rounded-bl-none border border-gray-100'
+                                                                    }`}>
+                                                                    {/* Text hiển thị */}
+                                                                    {msg.content && <p className="leading-relaxed break-words whitespace-pre-wrap">{msg.content}</p>}
+
+                                                                    {/* Phần thời gian nằm */}
+                                                                    <div className={`flex items-center justify-end gap-1 mt-1.5 text-[10px] select-none ${isMe ? 'text-blue-100/80' : 'text-gray-400'
+                                                                        }`}>
+                                                                        <span>{new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+
+                                                                        {isMe && (
+                                                                            <div className="flex items-center gap-0.5 ml-0.5">
+                                                                                {msg.isRead ? (
+                                                                                    <CheckCheck className={`w-3 h-3 stroke-[2.5] ${isMe ? 'text-cyan-200' : 'text-blue-500'}`} />
+                                                                                ) : (
+                                                                                    <Check className={`w-3 h-3 stroke-[2.5] ${isMe ? 'text-blue-200' : 'text-gray-400'}`} />
+                                                                                )}
+                                                                            </div>
+                                                                        )}
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+
+                                                        )}
                                                     </div>
                                                 </div>
                                             </div>

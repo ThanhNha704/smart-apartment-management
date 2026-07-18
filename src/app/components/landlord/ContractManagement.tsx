@@ -4,7 +4,7 @@ import * as Dialog from '@radix-ui/react-dialog';
 import { toast } from 'sonner';
 import { fetchApi } from '../../utils/api';
 
-// INTERFACES DỮ LIỆU CHUẨN BACKEND (Khớp 100% với Swagger)
+// INTERFACES
 interface ContractBackend {
   id: string;
   createdAt: string;
@@ -30,7 +30,7 @@ interface CreateContractInput {
   startDate: string;
   endDate: string;
   paymentDate: number;
-  monthlyRent: number; // Đảm bảo khớp với request body của POST /api/Contracts
+  price: number;
 }
 
 interface RoomOption { id: string; roomNumber: string; price: number; status: number; }
@@ -43,7 +43,7 @@ const blankCreateFormData: CreateContractInput = {
   startDate: '',
   endDate: '',
   paymentDate: 5,
-  monthlyRent: 0,
+  price: 0,
 };
 
 export default function ContractManagement() {
@@ -103,7 +103,7 @@ export default function ContractManagement() {
         setCreateFormData(prev => ({
           ...prev,
           roomNumber: targetRoom.roomNumber,
-          monthlyRent: targetRoom.price
+          price: targetRoom.price
         }));
       }
     }
@@ -119,7 +119,7 @@ export default function ContractManagement() {
     }
   }, [selectedTenantId, tenants, isCreateDialogOpen]);
 
-  // POST: Tạo hợp đồng mới (Sửa payload map chính xác sang "monthlyRent" theo Swagger)
+  // POST: Tạo hợp đồng mới
   const handleCreateContract = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
@@ -130,7 +130,7 @@ export default function ContractManagement() {
         startDate: createFormData.startDate ? new Date(createFormData.startDate).toISOString() : '',
         endDate: createFormData.endDate ? new Date(createFormData.endDate).toISOString() : '',
         paymentDate: createFormData.paymentDate,
-        monthlyRent: createFormData.monthlyRent, // Khớp chuẩn 100% Swagger
+        price: createFormData.price,
       };
 
       const response = await fetchApi('/Contracts', {
@@ -177,7 +177,7 @@ export default function ContractManagement() {
     }
   };
 
-  // PUT: Gia hạn hợp đồng gửi chuỗi ISO String chuẩn Swagger
+  // PUT: Gia hạn hợp đồng
   const handleExtendContract = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedContract || !extendEndDate) return;
@@ -374,7 +374,7 @@ export default function ContractManagement() {
                   <select value={selectedRoomId} onChange={(e) => {
                     setSelectedRoomId(e.target.value);
                     const room = rooms.find(r => r.id === e.target.value);
-                    if (room) setCreateFormData(prev => ({ ...prev, roomNumber: room.roomNumber, monthlyRent: room.price }));
+                    if (room) setCreateFormData(prev => ({ ...prev, roomNumber: room.roomNumber, price: room.price }));
                   }} className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-white" required>
                     <option value="">-- Chọn số phòng --</option>
                     {rooms.map(r => <option key={r.id} value={r.id}>Phòng {r.roomNumber} ({r.status === 0 ? 'Trống' : 'Đang thuê'})</option>)}
@@ -399,7 +399,7 @@ export default function ContractManagement() {
 
               <div>
                 <label className="block font-medium mb-1 text-gray-700">Giá phòng hàng tháng (₫) <span className="text-red-500">*</span></label>
-                <input type="number" value={createFormData.monthlyRent || ''} onChange={(e) => setCreateFormData({ ...createFormData, monthlyRent: Number(e.target.value) })} className="w-full px-3 py-2 border border-gray-300 rounded-lg font-medium" required />
+                <input type="number" value={createFormData.price || ''} onChange={(e) => setCreateFormData({ ...createFormData, price: Number(e.target.value) })} className="w-full px-3 py-2 border border-gray-300 rounded-lg font-medium" required />
               </div>
 
               <div className="flex gap-2 pt-4 border-t">

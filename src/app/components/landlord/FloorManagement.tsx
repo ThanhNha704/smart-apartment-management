@@ -4,7 +4,7 @@ import * as Dialog from '@radix-ui/react-dialog';
 import { toast } from 'sonner';
 import { fetchApi } from '../../utils/api';
 
-// Định nghĩa Interface chuẩn xác theo Schema phản hồi của GET /api/Floors
+// Định nghĩa Interface
 interface FloorItem {
   id: string;
   floorNumber: number;
@@ -35,7 +35,7 @@ export default function FloorManagement() {
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [floorToDelete, setFloorToDelete] = useState<string | null>(null);
 
-  // States quản lý dữ liệu Form nhập vào (chỉ giữ lại các trường có trong Request Body của backend)
+  // States quản lý dữ liệu Form nhập vào
   const [addFormData, setAddFormData] = useState({ floorNumber: '', name: '', description: '' });
   const [editFormData, setEditFormData] = useState({ floorNumber: '', name: '', description: '' });
 
@@ -45,7 +45,7 @@ export default function FloorManagement() {
       setIsLoading(true);
       const response = await fetchApi('/Floors');
       if (!response.ok) throw new Error('Không thể tải dữ liệu');
-      
+
       const data: ApiResponse = await response.json();
       setApiData(data);
     } catch (error) {
@@ -66,12 +66,12 @@ export default function FloorManagement() {
     return Math.round((floor.occupiedRooms / floor.roomCount) * 100);
   };
 
-  // Hàm POST: Thêm tầng mới (Khớp Schema Request Body: name, floorNumber, description)
+  // Hàm POST: Thêm tầng mới
   const handleAddFloor = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
       const num = parseInt(addFormData.floorNumber.replace(/\D/g, '')) || 0;
-      
+
       const payload = {
         name: addFormData.name || `Tầng ${num}`,
         floorNumber: num,
@@ -109,14 +109,14 @@ export default function FloorManagement() {
     setIsEditDialogOpen(true);
   };
 
-  // Hàm PUT: Cập nhật thông tin tầng (Khớp Schema Request Body: name, floorNumber, description)
+  // Hàm PUT: Cập nhật thông tin tầng
   const handleSaveEdit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedFloor) return;
 
     try {
       const num = parseInt(editFormData.floorNumber.replace(/\D/g, '')) || 0;
-      
+
       const payload = {
         name: editFormData.name || `Tầng ${num}`,
         floorNumber: num,
@@ -143,7 +143,7 @@ export default function FloorManagement() {
     }
   };
 
-  // Hàm DELETE: Xóa tầng
+  // Hàm DELETE
   const confirmDeleteFloor = async () => {
     if (!floorToDelete) return;
     try {
@@ -222,7 +222,7 @@ export default function FloorManagement() {
                   </div>
                   <div>
                     <h3 className="text-xl font-semibold">{floor.name}</h3>
-                    <p className="text-xs text-gray-400">Mã số số tầng: {floor.floorNumber}</p>
+                    {/* <p className="text-xs text-gray-400">Mã số số tầng: {floor.floorNumber}</p> */}
                     {floor.description && <p className="text-sm text-gray-500 mt-1">{floor.description}</p>}
                   </div>
                 </div>

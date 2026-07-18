@@ -4,14 +4,14 @@ import * as Dialog from '@radix-ui/react-dialog';
 import { toast } from 'sonner';
 import { fetchApi } from '../../utils/api';
 
-// Interface cập nhật chuẩn theo Backend Swagger
+// Interface
 interface Invoice {
   id: string;
   invoiceNumber: string;
   roomNumber: string;
   tenantName: string;
   billingPeriod: string;
-  dueDate: string; // Đổi từ dueTime -> dueDate theo backend
+  dueDate: string;
   status: number;  // 0 = Chờ thanh toán, 1 = Đã thanh toán, 2 = Quá hạn
   statusLabel: string;
   paidAmount: number;
@@ -27,7 +27,7 @@ interface Invoice {
   note: string;
 }
 
-// Option phục vụ thẻ select tự động map dữ liệu
+// Option thẻ select
 interface RoomOption { id: string; roomNumber: string; price: number; }
 interface TenantOption { id: string; name: string; }
 
@@ -41,7 +41,7 @@ const blankCreateFormData = {
   waterPrice: 12000,
   serviceFee: 150000,
   roomPrice: 0,
-  dueDate: '', // Đổi từ dueTime -> dueDate
+  dueDate: '',
 };
 
 export default function InvoiceManagement() {
@@ -88,7 +88,7 @@ export default function InvoiceManagement() {
     loadInitialData();
   }, []);
 
-  // Tự động điền số phòng và giá phòng khi chọn phòng từ danh sách
+  // Tự động điền số phòng và giá phòng
   useEffect(() => {
     const activeRoom = rooms.find(r => r.id === selectedRoomId);
     if (activeRoom) {
@@ -108,7 +108,7 @@ export default function InvoiceManagement() {
     }
   }, [selectedTenantId, tenants]);
 
-  // Hàm POST: Gửi dữ liệu tạo hóa đơn mới lên Swagger Server
+  // Hàm POST: Gửi dữ liệu tạo hóa đơn mới
   const handleCreateInvoice = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!createFormData.roomNumber || !createFormData.tenantName || !createFormData.dueDate) {
@@ -131,7 +131,7 @@ export default function InvoiceManagement() {
       waterPrice: createFormData.waterPrice,
       serviceFee: createFormData.serviceFee,
       amount: totalAmount,
-      dueDate: new Date(createFormData.dueDate).toISOString() // Đồng bộ cấu trúc tên trường theo Swagger
+      dueDate: new Date(createFormData.dueDate).toISOString()
     };
 
     try {
@@ -156,7 +156,7 @@ export default function InvoiceManagement() {
     }
   };
 
-  // Hàm PUT: Cập nhật trạng thái thanh toán (/api/Invoices/{id}/pay)
+  // Hàm PUT: Cập nhật trạng thái thanh toán
   const handlePayInvoice = async (id: string) => {
     try {
       const response = await fetchApi(`/Invoices/${id}/pay`, { method: 'PUT' });
@@ -215,7 +215,7 @@ export default function InvoiceManagement() {
     <div className="p-6 max-w-7xl mx-auto">
       <div className="mb-6">
         <h1 className="text-2xl font-semibold mb-1">Quản lý hóa đơn</h1>
-        <p className="text-gray-600">Đồng bộ dữ liệu thời gian thực qua Swagger API</p>
+        <p className="text-gray-600">Quản lý và theo dõi các hóa đơn thanh toán</p>
       </div>
 
       {/* Tìm kiếm & Bộ lọc */}
@@ -241,12 +241,12 @@ export default function InvoiceManagement() {
             <option value="0">Chờ thanh toán</option>
             <option value="2">Quá hạn</option>
           </select>
-          <button
+          {/* <button
             onClick={() => setIsCreateDialogOpen(true)}
             className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center gap-2 text-sm font-medium transition-colors shrink-0"
           >
             <Plus className="w-5 h-5" /> Tạo hóa đơn
-          </button>
+          </button> */}
         </div>
       </div>
 
@@ -462,7 +462,7 @@ export default function InvoiceManagement() {
           <Dialog.Overlay className="fixed inset-0 bg-black/50 z-50" />
           <Dialog.Content aria-describedby={undefined} className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-white rounded-lg p-6 w-full max-w-sm z-50 text-sm shadow-2xl">
             <Dialog.Title className="text-lg font-bold text-gray-900 mb-2">Hủy bỏ hóa đơn vĩnh viễn</Dialog.Title>
-            <p className="text-gray-500 mb-4">Bạn chắc chắn muốn loại bỏ mã hóa đơn <strong className="text-gray-900">{invoiceToDelete?.invoiceNumber || invoiceToDelete?.id.slice(0, 8)}</strong>? Thao tác này sẽ xóa vĩnh viễn trên Swagger Server.</p>
+            <p className="text-gray-500 mb-4">Bạn chắc chắn muốn loại bỏ mã hóa đơn <strong className="text-gray-900">{invoiceToDelete?.invoiceNumber || invoiceToDelete?.id.slice(0, 8)}</strong>? Thao tác sẽ xóa vĩnh viễn hóa đơn này.</p>
             <div className="flex gap-2">
               <Dialog.Close className="flex-1 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 font-medium">Hủy</Dialog.Close>
               <button onClick={handleDeleteInvoice} className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg font-medium hover:bg-red-700">Xác nhận xóa</button>
