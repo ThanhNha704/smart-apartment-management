@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Search, Plus, Eye, QrCode, CheckCircle, Clock, XCircle, Trash2, Loader2 } from 'lucide-react';
+import { Search, Eye, QrCode, CheckCircle, Clock, XCircle, Trash2, Loader2 } from 'lucide-react';
 import * as Dialog from '@radix-ui/react-dialog';
 import { toast } from 'sonner';
 import { fetchApi } from '../../utils/api';

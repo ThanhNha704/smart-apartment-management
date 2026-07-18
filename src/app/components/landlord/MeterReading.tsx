@@ -1,15 +1,9 @@
 import { useState, useEffect } from 'react';
-import { Calendar, Loader2, Info, Zap, Droplet } from 'lucide-react';
+import { Calendar, Loader2, Info, Zap, Droplet, ChevronLeft, ChevronRight } from 'lucide-react';
 import { toast } from 'sonner';
 import { fetchApi } from '../../utils/api';
 
 // INTERFACES
-interface Room {
-  id: string;
-  roomNumber: string;
-  tenantName: string;
-}
-
 interface MeterReadingItem {
   id: string;
   roomNumber: string;
@@ -29,34 +23,26 @@ interface MeterReadingItem {
 }
 
 export default function MeterReadingHistory() {
-  const [rooms, setRooms] = useState<Room[]>([]);
   const [readings, setReadings] = useState<MeterReadingItem[]>([]);
   const [isLoading, setIsLoading] = useState(false);
-  const [selectedRoomNumber, setSelectedRoomNumber] = useState('');
   const [filterType, setFilterType] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState('');
+  
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 6; // Số lượng bản ghi trên mỗi trang
 
-  // Hàm GET: Tải danh sách phòng và lịch sử ghi số từ hệ thống
+  // Hàm GET: Tải lịch sử ghi số từ hệ thống
   const fetchData = async () => {
     try {
       setIsLoading(true);
-
-      // Lấy toàn bộ danh sách phòng và toàn bộ lịch sử công tơ
-      const [roomsRes, readingsRes] = await Promise.all([
-        fetchApi('/Rooms'),
-        fetchApi('/MeterReadings'),
-      ]);
-
-      if (roomsRes.ok) {
-        const roomsData = await roomsRes.json();
-        setRooms(roomsData);
-      } else throw new Error('Không thể tải danh sách phòng');
+      const readingsRes = await fetchApi('/MeterReadings');
 
       if (readingsRes.ok) {
         const readingsData = await readingsRes.json();
         setReadings(readingsData);
-      } else throw new Error('Không thể tải lịch sử ghi số');
-
+      } else {
+        throw new Error('Không thể tải lịch sử ghi số');
+      }
     } catch (error) {
       console.error("Lỗi lấy dữ liệu từ backend:", error);
       toast.error('Lỗi khi tải dữ liệu từ máy chủ!');
@@ -65,28 +51,26 @@ export default function MeterReadingHistory() {
     }
   };
 
-  // Tự động tải lại
   useEffect(() => {
     fetchData();
-  }, [selectedRoomNumber]);
+  }, []);
+
+  // Reset về trang 1 mỗi khi người dùng thay đổi bộ lọc hoặc từ khóa tìm kiếm
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [filterType, searchQuery]);
 
   // Bộ lọc dữ liệu theo loại công tơ (Điện / Nước) và tên phòng
   const filteredReadings = readings.filter(reading => {
-    // Lọc theo Loại dịch vụ (Điện/Nước)
     const matchesType = filterType === 'all' || reading.type.toString() === filterType;
-
-    // Lọc theo Từ khóa tìm kiếm
     const query = searchQuery.toLowerCase().trim();
 
-    // Nếu không nhập từ khóa, giữ nguyên
     if (!query) return matchesType;
 
-    // Chuẩn hóa dữ liệu phòng
     const roomNumberStr = reading.roomNumber ? reading.roomNumber.toLowerCase() : '';
     const tenantNameStr = reading.tenantName ? reading.tenantName.toLowerCase() : '';
     const typeLabelStr = reading.typeLabel ? reading.typeLabel.toLowerCase() : '';
 
-    // Kiểm tra xem từ khóa có khớp với số phòng, tên khách hoặc loại nhãn không
     const matchesQuery = 
       roomNumberStr.includes(query) || 
       tenantNameStr.includes(query) ||
@@ -94,6 +78,15 @@ export default function MeterReadingHistory() {
 
     return matchesType && matchesQuery;
   });
+
+  // XỬ LÝ PHÂN TRANG
+  const totalItems = filteredReadings.length;
+  const totalPages = Math.ceil(totalItems / itemsPerPage);
+  
+  // Cắt mảng dữ liệu để chỉ hiển thị các item thuộc trang hiện tại
+  const indexOfLastItem = currentPage * itemsPerPage;
+  const indexOfFirstItem = indexOfLastItem - itemsPerPage;
+  const currentReadings = filteredReadings.slice(indexOfFirstItem, indexOfLastItem);
 
   return (
     <div className="p-6 max-w-7xl mx-auto">
@@ -115,7 +108,7 @@ export default function MeterReadingHistory() {
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Nhập số phòng (ví dụ: 101, P101), tên khách..."
+            placeholder="Nhập số phòng (ví dụ: 101, P101)..."
             className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
           />
         </div>
@@ -146,74 +139,120 @@ export default function MeterReadingHistory() {
             <p className="text-xs text-gray-400 mt-1">Chưa có chỉ số công tơ nào được ghi nhận khớp với bộ lọc hiện tại.</p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {filteredReadings.map((reading) => (
-              <div
-                key={reading.id}
-                className="p-5 border border-gray-200 rounded-xl hover:shadow-md transition-all flex flex-col justify-between bg-white"
-              >
-                <div>
-                  {/* Header của thẻ card */}
-                  <div className="flex items-start justify-between mb-3">
-                    <div>
-                      <p className="font-semibold text-lg text-gray-900">
-                        Phòng {reading.roomNumber}
-                      </p>
-                      <p className="text-sm text-gray-500 line-clamp-1">
-                        Khách: {reading.tenantName || 'Trống / Chưa có'}
-                      </p>
+          <>
+            {/* Grid hiển thị danh sách đã cắt theo phân trang */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
+              {currentReadings.map((reading) => (
+                <div
+                  key={reading.id}
+                  className="p-5 border border-gray-200 rounded-xl hover:shadow-md transition-all flex flex-col justify-between bg-white"
+                >
+                  <div>
+                    {/* Header của thẻ card */}
+                    <div className="flex items-start justify-between mb-3">
+                      <div>
+                        <p className="font-semibold text-lg text-gray-900">
+                          Phòng {reading.roomNumber}
+                        </p>
+                        <p className="text-sm text-gray-500 line-clamp-1">
+                          Khách: {reading.tenantName || 'Trống / Chưa có'}
+                        </p>
+                      </div>
+
+                      {/* Icon phân biệt Điện / Nước */}
+                      {reading.type === 0 ? (
+                        <span className="flex items-center gap-1 px-2.5 py-1 bg-amber-50 text-amber-700 rounded-full text-xs font-semibold border border-amber-200">
+                          <Zap className="w-3 h-3 fill-amber-500 text-amber-500" /> Điện
+                        </span>
+                      ) : (
+                        <span className="flex items-center gap-1 px-2.5 py-1 bg-blue-50 text-blue-700 rounded-full text-xs font-semibold border border-blue-200">
+                          <Droplet className="w-3 h-3 fill-blue-500 text-blue-500" /> Nước
+                        </span>
+                      )}
                     </div>
 
-                    {/* Icon phân biệt Điện / Nước */}
-                    {reading.type === 0 ? (
-                      <span className="flex items-center gap-1 px-2.5 py-1 bg-amber-50 text-amber-700 rounded-full text-xs font-semibold border border-amber-200">
-                        <Zap className="w-3 h-3 fill-amber-500 text-amber-500" /> Điện
-                      </span>
-                    ) : (
-                      <span className="flex items-center gap-1 px-2.5 py-1 bg-blue-50 text-blue-700 rounded-full text-xs font-semibold border border-blue-200">
-                        <Droplet className="w-3 h-3 fill-blue-500 text-blue-500" /> Nước
-                      </span>
-                    )}
+                    {/* Kỳ hóa đơn */}
+                    <div className="flex items-center gap-1.5 text-xs text-gray-500 mb-4 bg-gray-50 px-2 py-1.5 rounded-md w-fit">
+                      <Calendar className="w-3.5 h-3.5 text-gray-400" />
+                      <span>Kỳ hóa đơn: <strong>Tháng {reading.month}/{reading.year}</strong></span>
+                    </div>
+
+                    {/* Khối chỉ số chi tiết */}
+                    <div className="grid grid-cols-3 gap-2 text-center bg-gray-50/50 p-3 rounded-lg border border-gray-100">
+                      <div>
+                        <p className="text-gray-400 text-[11px] font-medium uppercase tracking-wider">Chỉ số cũ</p>
+                        <p className="font-semibold text-gray-700 mt-0.5 text-sm">{reading.previousIndex}</p>
+                      </div>
+                      <div className="border-x border-gray-200">
+                        <p className="text-gray-400 text-[11px] font-medium uppercase tracking-wider">Chỉ số mới</p>
+                        <p className="font-semibold text-gray-700 mt-0.5 text-sm">{reading.currentIndex}</p>
+                      </div>
+                      <div>
+                        <p className="text-gray-400 text-[11px] font-medium uppercase tracking-wider">Tiêu thụ</p>
+                        <p className="font-bold text-blue-600 mt-0.5 text-sm">
+                          {reading.usageLabel || `${reading.usage} ${reading.type === 0 ? 'kWh' : 'm³'}`}
+                        </p>
+                      </div>
+                    </div>
                   </div>
 
-                  {/* Kỳ hóa đơn */}
-                  <div className="flex items-center gap-1.5 text-xs text-gray-500 mb-4 bg-gray-50 px-2 py-1.5 rounded-md w-fit">
-                    <Calendar className="w-3.5 h-3.5 text-gray-400" />
-                    <span>Kỳ hóa đơn: <strong>Tháng {reading.month}/{reading.year}</strong></span>
-                  </div>
-
-                  {/* Khối chỉ số chi tiết */}
-                  <div className="grid grid-cols-3 gap-2 text-center bg-gray-50/50 p-3 rounded-lg border border-gray-100">
-                    <div>
-                      <p className="text-gray-400 text-[11px] font-medium uppercase tracking-wider">Chỉ số cũ</p>
-                      <p className="font-semibold text-gray-700 mt-0.5 text-sm">{reading.previousIndex}</p>
-                    </div>
-                    <div className="border-x border-gray-200">
-                      <p className="text-gray-400 text-[11px] font-medium uppercase tracking-wider">Chỉ số mới</p>
-                      <p className="font-semibold text-gray-700 mt-0.5 text-sm">{reading.currentIndex}</p>
-                    </div>
-                    <div>
-                      <p className="text-gray-400 text-[11px] font-medium uppercase tracking-wider">Tiêu thụ</p>
-                      <p className="font-bold text-blue-600 mt-0.5 text-sm">
-                        {reading.usageLabel || `${reading.usage} ${reading.type === 0 ? 'kWh' : 'm³'}`}
+                  {/* Phần tính tiền */}
+                  <div className="mt-4 pt-3 border-t border-gray-100 flex justify-between items-center">
+                    <p className="text-xs text-gray-500">Đơn giá: {reading.unitPrice.toLocaleString('vi-VN')} đ</p>
+                    <div className="text-right">
+                      <p className="text-xs text-gray-400">Thành tiền</p>
+                      <p className="font-bold text-green-600 text-base">
+                        {reading.total.toLocaleString('vi-VN')} ₫
                       </p>
                     </div>
                   </div>
                 </div>
+              ))}
+            </div>
 
-                {/* Phần tính tiền */}
-                <div className="mt-4 pt-3 border-t border-gray-100 flex justify-between items-center">
-                  <p className="text-xs text-gray-500">Đơn giá: {reading.unitPrice.toLocaleString('vi-VN')} đ</p>
-                  <div className="text-right">
-                    <p className="text-xs text-gray-400">Thành tiền</p>
-                    <p className="font-bold text-green-600 text-base">
-                      {reading.total.toLocaleString('vi-VN')} ₫
-                    </p>
-                  </div>
+            {/* THANH ĐIỀU HƯỚNG PHÂN TRANG (PAGINATION BAR) */}
+            <div className="flex flex-col sm:flex-row items-center justify-between pt-4 border-t border-gray-100 gap-4">
+              <p className="text-sm text-gray-500">
+                Hiển thị <span className="font-medium">{indexOfFirstItem + 1}</span> -{' '}
+                <span className="font-medium">{Math.min(indexOfLastItem, totalItems)}</span> trên tổng số{' '}
+                <span className="font-medium">{totalItems}</span> bản ghi
+              </p>
+              
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                  disabled={currentPage === 1}
+                  className="p-2 border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-40 disabled:hover:bg-white disabled:cursor-not-allowed transition-all"
+                >
+                  <ChevronLeft className="w-4 h-4 text-gray-600" />
+                </button>
+
+                <div className="flex items-center gap-1">
+                  {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+                    <button
+                      key={page}
+                      onClick={() => setCurrentPage(page)}
+                      className={`px-3.5 py-1.5 rounded-lg text-sm font-medium transition-all ${
+                        currentPage === page
+                          ? 'bg-blue-600 text-white shadow-sm'
+                          : 'border border-gray-300 hover:bg-gray-50 text-gray-700'
+                      }`}
+                    >
+                      {page}
+                    </button>
+                  ))}
                 </div>
+
+                <button
+                  onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                  disabled={currentPage === totalPages}
+                  className="p-2 border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-40 disabled:hover:bg-white disabled:cursor-not-allowed transition-all"
+                >
+                  <ChevronRight className="w-4 h-4 text-gray-600" />
+                </button>
               </div>
-            ))}
-          </div>
+            </div>
+          </>
         )}
       </div>
 

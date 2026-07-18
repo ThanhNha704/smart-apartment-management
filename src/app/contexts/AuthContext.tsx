@@ -37,18 +37,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
 
-  // Chạy một lần duy nhất khi ứng dụng khởi chạy / reload (F5)
+  // SỬA: Phục hồi trạng thái đồng bộ hoàn toàn trước khi tắt trạng thái Loading
   useEffect(() => {
-    const localUser = localStorage.getItem('user');
-    const sessionUser = sessionStorage.getItem('user');
+    try {
+      const localUser = localStorage.getItem('user');
+      const sessionUser = sessionStorage.getItem('user');
 
-    if (localUser) {
-      setUser(JSON.parse(localUser));
-    } else if (sessionUser) {
-      setUser(JSON.parse(sessionUser));
+      if (localUser) {
+        setUser(JSON.parse(localUser));
+      } else if (sessionUser) {
+        setUser(JSON.parse(sessionUser));
+      }
+    } catch (error) {
+      console.error("Lỗi đọc dữ liệu auth từ storage:", error);
+      // Nếu dữ liệu storage lỗi (dữ liệu rác), clear sạch sẽ luôn
+      localStorage.clear();
+      sessionStorage.clear();
+    } finally {
+      // Đảm bảo mọi thứ chạy xong mới tắt loading
+      setIsLoading(false);
     }
-
-    setIsLoading(false);
   }, []);
 
   const login = async (email: string, password: string, rememberMe: boolean): Promise<User> => {
@@ -68,7 +76,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const userData: User = await response.json();
     setUser(userData);
 
-    // Xử lý lưu trữ thông tin dựa trên checkbox Ghi nhớ đăng nhập
     if (rememberMe) {
       localStorage.setItem('user', JSON.stringify(userData));
       localStorage.setItem('token', userData.token);
@@ -97,11 +104,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       throw new Error(errorData || 'Đăng ký thất bại');
     }
 
-    const userData: User = await response.json();
-    setUser(userData);
-    
-    sessionStorage.setItem('user', JSON.stringify(userData));
-    sessionStorage.setItem('token', userData.token);
+    // SỬA CHỖ NÀY: Không ép kiểu response.json() của Register thành User
+    // Đăng ký xong nên điều hướng bắt họ đăng nhập lại hoặc trả về thông báo, tránh set bậy token lỗi vào state.
   };
 
   const logout = async () => {
@@ -112,12 +116,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } catch (error) {
       console.error('Lỗi khi gọi API logout:', error);
     } finally {
-      // Luôn dọn dẹp sạch sẽ dữ liệu ở Client
       setUser(null);
       localStorage.removeItem('user');
       localStorage.removeItem('token');
       sessionStorage.removeItem('user');
       sessionStorage.removeItem('token');
+      
+      // Xóa các dữ liệu phụ (như ID chat ở câu hỏi trước) để tránh rác storage
+      localStorage.removeItem('active_chat_user_id');
     }
   };
 

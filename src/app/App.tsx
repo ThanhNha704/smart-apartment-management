@@ -18,7 +18,7 @@ import MeterReading from './components/landlord/MeterReading';
 import MaintenanceRequests from './components/landlord/MaintenanceRequests';
 import Messages from './components/landlord/ChatManagement';
 import Notification from './components/landlord/NotificationManagement';
-import Settings from './components/landlord/Settings';
+// import Settings from './components/landlord/Settings';
 
 function ProtectedRoute({ children }: { children: React.ReactNode; }) {
   const { isAuthenticated, isLoading } = useAuth(); // Thêm isLoading từ AuthContext nếu có
@@ -57,7 +57,7 @@ function LandlordLayout() {
           <Route path="/maintenance" element={<MaintenanceRequests />} />
           <Route path="/messages" element={<Messages />} />
           <Route path="/notification" element={<Notification />} />
-          <Route path="/settings" element={<Settings />} />
+          {/* <Route path="/settings" element={<Settings />} /> */}
           {/* Tự động redirect các route không tồn tại trong dashboard về trang chủ */}
           <Route path="*" element={<Navigate to="/dashboard" replace />} />
         </Routes>
