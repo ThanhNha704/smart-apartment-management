@@ -3,21 +3,22 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router';
 import { Toaster } from 'sonner';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 
-import LoginPage from './components/auth/LoginPage';
+import LoginPage from './pages/auth/LoginPage';
 // import RegisterPage from './components/auth/RegisterPage';
 // import ForgotPasswordPage from './components/auth/ForgotPasswordPage';
 
-import Sidebar from './components/landlord/Sidebar';
-import Dashboard from './components/landlord/Dashboard';
-import FloorManagement from './components/landlord/FloorManagement';
-import RoomManagement from './components/landlord/RoomManagement';
-import InvoiceManagement from './components/landlord/InvoiceManagement';
-import TenantManagement from './components/landlord/TenantManagement';
-import ContractManagement from './components/landlord/ContractManagement';
-import MeterReading from './components/landlord/MeterReading';
-import MaintenanceRequests from './components/landlord/MaintenanceRequests';
-import Messages from './components/landlord/ChatManagement';
-import Notification from './components/landlord/NotificationManagement';
+import Sidebar from './components/Sidebar';
+import Dashboard from './pages/landlord/Dashboard';
+import FloorManagement from './pages/landlord/FloorManagement';
+import RoomManagement from './pages/landlord/RoomManagement';
+import InvoiceManagement from './pages/landlord/InvoiceManagement';
+import TenantManagement from './pages/landlord/TenantManagement';
+import ContractManagement from './pages/landlord/ContractManagement';
+import MeterReading from './pages/landlord/MeterReading';
+import MaintenanceRequests from './pages/landlord/MaintenanceRequests';
+// import Messages from './pages/landlord/ChatManagement';
+import Messages from './pages/AdminChat/AdminChat';
+import Notification from './pages/landlord/NotificationManagement';
 // import Settings from './components/landlord/Settings';
 
 function ProtectedRoute({ children }: { children: React.ReactNode; }) {

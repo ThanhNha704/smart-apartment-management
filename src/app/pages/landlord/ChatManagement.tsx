@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { Search, Send, Image as ImageIcon, Check, CheckCheck, Loader2, ArrowLeft, User, Download } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '../../contexts/AuthContext';
-import { fetchApi } from '../../utils/api';
+import { fetchApi } from '../../api/fetchApi';
 
 // INTERFACES
 interface Message {
@@ -307,7 +307,7 @@ export default function ChatManagement() {
                                 placeholder="Tìm khách thuê..."
                                 value={searchUser}
                                 onChange={(e) => setSearchUser(e.target.value)}
-                                className="w-full pl-9 pr-4 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                className="w-full pl-9 pr-4 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-black"
                             />
                         </div>
                     </div>
@@ -523,7 +523,7 @@ export default function ChatManagement() {
                                     placeholder="Nhập tin nhắn..."
                                     value={inputText}
                                     onChange={(e) => setInputText(e.target.value)}
-                                    className="flex-1 px-4 py-2 border border-gray-200 rounded-full text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                    className="flex-1 px-4 py-2 border border-gray-200 rounded-full text-sm focus:outline-none focus:ring-1 focus:ring-black focus:border-transparent"
                                 />
 
                                 <button

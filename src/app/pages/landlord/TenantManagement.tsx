@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { Search, Plus, Edit, Trash2, Phone, Mail, MapPin, Loader2, Eye, EyeOff, CreditCard, Calendar } from 'lucide-react';
 import * as Dialog from '@radix-ui/react-dialog';
 import { toast } from 'sonner';
-import { fetchApi } from '../../utils/api';
+import { fetchApi } from '../../api/fetchApi';
 
 // Interface
 interface UserTenant {
@@ -228,7 +228,7 @@ export default function TenantManagement() {
               placeholder="Tìm kiếm theo tên, số điện thoại, CCCD, email..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-black"
             />
           </div>
 
@@ -335,7 +335,7 @@ export default function TenantManagement() {
                     type="text" required
                     value={formData.name}
                     onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-1 focus:ring-black focus:outline-none"
                     placeholder="Nguyễn Văn A"
                   />
                 </div>
@@ -345,7 +345,7 @@ export default function TenantManagement() {
                     type="text" required
                     value={formData.phoneNumber}
                     onChange={(e) => setFormData({ ...formData, phoneNumber: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-1 focus:ring-black focus:outline-none"
                     placeholder="090xxxxxxx"
                   />
                 </div>
@@ -355,7 +355,7 @@ export default function TenantManagement() {
                     type="text" required
                     value={formData.idCard}
                     onChange={(e) => setFormData({ ...formData, idCard: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none font-mono"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-1 focus:ring-black focus:outline-none font-mono"
                     placeholder="079xxxxxxxxxx"
                   />
                 </div>
@@ -365,7 +365,7 @@ export default function TenantManagement() {
                     type="date" required
                     value={formData.dateOfBirth}
                     onChange={(e) => setFormData({ ...formData, dateOfBirth: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-1 focus:ring-black focus:outline-none"
                   />
                 </div>
                 <div className="md:col-span-2">
@@ -375,7 +375,7 @@ export default function TenantManagement() {
                       type={showPassword ? "text" : "password"}
                       value={formData.password}
                       onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-1 focus:ring-black focus:outline-none"
                       placeholder="••••••••"
                       required
                     />
@@ -396,7 +396,7 @@ export default function TenantManagement() {
                   type="email"
                   value={formData.email}
                   onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-1 focus:ring-black focus:outline-none"
                   placeholder="nguyenvana@email.com"
                 />
               </div>
@@ -407,7 +407,7 @@ export default function TenantManagement() {
                   type="text"
                   value={formData.address}
                   onChange={(e) => setFormData({ ...formData, address: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-1 focus:ring-black focus:outline-none"
                   placeholder="Xã/Phường, Quận/Huyện, Tỉnh Thành"
                 />
               </div>
@@ -435,7 +435,7 @@ export default function TenantManagement() {
                     type="text" required
                     value={formData.name}
                     onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-1 focus:ring-black focus:outline-none"
                   />
                 </div>
                 <div>
@@ -444,7 +444,7 @@ export default function TenantManagement() {
                     type="text" required
                     value={formData.phoneNumber}
                     onChange={(e) => setFormData({ ...formData, phoneNumber: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-1 focus:ring-black focus:outline-none"
                   />
                 </div>
                 <div>
@@ -453,7 +453,7 @@ export default function TenantManagement() {
                     type="text" required
                     value={formData.idCard}
                     onChange={(e) => setFormData({ ...formData, idCard: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg font-mono focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg font-mono focus:ring-1 focus:ring-black focus:outline-none"
                   />
                 </div>
                 <div>
@@ -463,7 +463,7 @@ export default function TenantManagement() {
                     required
                     value={formData.dateOfBirth}
                     onChange={(e) => setFormData({ ...formData, dateOfBirth: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-1 focus:ring-black focus:outline-none"
                   />
                 </div>
                 <div className="md:col-span-2">
@@ -472,7 +472,7 @@ export default function TenantManagement() {
                     type="password"
                     value={formData.password}
                     onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-1 focus:ring-black focus:outline-none"
                     placeholder="Nhập mật khẩu mới"
                   />
                 </div>
@@ -484,7 +484,7 @@ export default function TenantManagement() {
                   type="email"
                   value={formData.email}
                   onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-1 focus:ring-black focus:outline-none"
                 />
               </div>
 
@@ -494,7 +494,7 @@ export default function TenantManagement() {
                   type="text"
                   value={formData.address}
                   onChange={(e) => setFormData({ ...formData, address: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-1 focus:ring-black focus:outline-none"
                 />
               </div>
 

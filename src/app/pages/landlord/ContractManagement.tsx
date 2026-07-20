@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
-import { Search, Plus, FileText, CheckCircle, Clock, XCircle, Calendar, Eye, Loader2 } from 'lucide-react';
+import { Search, Plus, FileText, CheckCircle, Clock, XCircle, Calendar, Eye, Loader2, ArrowUpDown } from 'lucide-react';
 import * as Dialog from '@radix-ui/react-dialog';
 import { toast } from 'sonner';
-import { fetchApi } from '../../utils/api';
+import { fetchApi } from '../../api/fetchApi';
 
 // INTERFACES
 interface ContractBackend {
@@ -51,8 +51,15 @@ export default function ContractManagement() {
   const [rooms, setRooms] = useState<RoomOption[]>([]);
   const [tenants, setTenants] = useState<TenantOption[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  
+  // States Tìm kiếm, Lọc & Sắp xếp
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState<string>('all');
+  const [sortBy, setSortBy] = useState<string>('endDate_asc'); // Mặc định sắp xếp ngày hết hạn gần nhất
+
+  // States Phân trang
+  const [currentPage, setCurrentPage] = useState<number>(1);
+  const itemsPerPage = 5; // Số lượng hợp đồng hiển thị trên mỗi trang
 
   // Quản lý trạng thái các Dialogs
   const [selectedContract, setSelectedContract] = useState<ContractBackend | null>(null);
@@ -94,6 +101,11 @@ export default function ContractManagement() {
   useEffect(() => {
     fetchData();
   }, []);
+
+  // Reset trang về 1 khi từ khóa tìm kiếm hoặc bộ lọc thay đổi
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, filterStatus, sortBy]);
 
   // Tự động map dữ liệu phòng sang Form khi tạo mới
   useEffect(() => {
@@ -155,7 +167,7 @@ export default function ContractManagement() {
     }
   };
 
-  // PUT: Thanh lý hợp đồng
+   // PUT: Thanh lý hợp đồng
   const handleTerminateContract = async () => {
     if (!contractToTerminate) return;
     try {
@@ -202,13 +214,42 @@ export default function ContractManagement() {
     }
   };
 
-  // Lọc dữ liệu hiển thị
-  const filteredContracts = contracts.filter(c => {
-    const matchesSearch = c.contractNumber?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      c.tenantName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      c.roomNumber?.toLowerCase().includes(searchTerm.toLowerCase());
-    return matchesSearch && (filterStatus === 'all' || String(c.status) === filterStatus);
-  });
+  // Logic Xử lý Tìm kiếm -> Lọc -> Sắp xếp dữ liệu hiển thị
+  const processedContracts = contracts
+    .filter(c => {
+      const matchesSearch = c.contractNumber?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        c.tenantName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        c.roomNumber?.toLowerCase().includes(searchTerm.toLowerCase());
+      return matchesSearch && (filterStatus === 'all' || String(c.status) === filterStatus);
+    })
+    .sort((a, b) => {
+      switch (sortBy) {
+        case 'contractNumber_asc':
+          return (a.contractNumber || '').localeCompare(b.contractNumber || '');
+        case 'contractNumber_desc':
+          return (b.contractNumber || '').localeCompare(a.contractNumber || '');
+        case 'roomNumber_asc':
+          return (a.roomNumber || '').localeCompare(b.roomNumber || '', undefined, { numeric: true });
+        case 'roomNumber_desc':
+          return (b.roomNumber || '').localeCompare(a.roomNumber || '', undefined, { numeric: true });
+        case 'price_asc':
+          return a.price - b.price;
+        case 'price_desc':
+          return b.price - a.price;
+        case 'endDate_asc':
+          return new Date(a.endDate).getTime() - new Date(b.endDate).getTime();
+        case 'endDate_desc':
+          return new Date(b.endDate).getTime() - new Date(a.endDate).getTime();
+        default:
+          return 0;
+      }
+    });
+
+  // Tính toán phân trang dựa trên mảng dữ liệu đã qua xử lý lọc/sắp xếp
+  const totalItems = processedContracts.length;
+  const totalPages = Math.ceil(totalItems / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const paginatedContracts = processedContracts.slice(startIndex, startIndex + itemsPerPage);
 
   const renderStatusBadge = (label: string, status: number) => {
     const isSuccess = status === 0 || label?.toLowerCase().includes('hiệu lực');
@@ -238,22 +279,39 @@ export default function ContractManagement() {
         <p className="text-gray-600">Theo dõi thông tin, tạo mới và quản lý thời hạn hợp đồng phòng thuê</p>
       </div>
 
-      {/* Tìm kiếm & Bộ lọc */}
-      <div className="bg-white rounded-lg border border-gray-200 mb-6 p-4 flex flex-col md:flex-row gap-4">
+      {/* Tìm kiếm, Bộ lọc & Sắp xếp */}
+      <div className="bg-white rounded-lg border border-gray-200 mb-6 p-4 flex flex-col lg:flex-row gap-4">
         <div className="flex-1 relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
           <input
             type="text" placeholder="Tìm kiếm theo mã HĐ, tên phòng, người thuê..." value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-black text-sm"
           />
         </div>
-        <div className="flex gap-2">
-          <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)} className="px-4 py-2 border border-gray-300 rounded-lg bg-white text-sm text-gray-700">
+        <div className="flex flex-wrap gap-2 items-center">
+          {/* Lọc Trạng Thái */}
+          <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)} className="px-3 py-2 border border-gray-300 rounded-lg bg-white text-sm text-gray-700 focus:ring-1 focus:ring-black">
             <option value="all">Tất cả trạng thái</option>
             <option value="0">Đang hiệu lực</option>
             <option value="1">Hết hạn / Đã chấm dứt</option>
           </select>
+
+          {/* Sắp Xếp Dữ Liệu */}
+          <div className="flex items-center gap-1 border border-gray-300 rounded-lg px-3 py-2 bg-white">
+            <ArrowUpDown className="w-4 h-4 text-gray-400" />
+            <select value={sortBy} onChange={(e) => setSortBy(e.target.value)} className="bg-transparent text-sm text-gray-700 focus:outline-none cursor-pointer">
+              <option value="endDate_asc">Hết hạn: Xa nhất → Gần nhất</option>
+              <option value="endDate_desc">Hết hạn: Gần nhất → Xa nhất</option>
+              <option value="contractNumber_asc">Mã hợp đồng (A-Z)</option>
+              <option value="contractNumber_desc">Mã hợp đồng (Z-A)</option>
+              <option value="roomNumber_asc">Số phòng (Tăng dần)</option>
+              <option value="roomNumber_desc">Số phòng (Giảm dần)</option>
+              <option value="price_asc">Giá thuê (Thấp → Cao)</option>
+              <option value="price_desc">Giá thuê (Cao → Thấp)</option>
+            </select>
+          </div>
+
           <button
             onClick={() => {
               setCreateFormData(blankCreateFormData);
@@ -261,19 +319,24 @@ export default function ContractManagement() {
               setSelectedTenantId('');
               setIsCreateDialogOpen(true);
             }}
-            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center gap-2 text-sm font-medium shrink-0"
+            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center gap-2 text-sm font-medium shrink-0 shadow-sm"
           >
-            <Plus className="w-5 h-5" /> Tạo hợp đồng
+            <Plus className="w-4 h-4" /> Tạo hợp đồng
           </button>
         </div>
       </div>
 
-      {/* Danh sách hợp đồng */}
+      {/* Số lượng tìm thấy hỗ trợ UX */}
+      <div className="mb-4 text-sm text-gray-500">
+        Tìm thấy <span className="font-semibold text-gray-700">{totalItems}</span> hợp đồng phù hợp.
+      </div>
+
+      {/* Danh sách hợp đồng đã phân trang */}
       <div className="grid grid-cols-1 gap-4">
-        {filteredContracts.length === 0 ? (
+        {paginatedContracts.length === 0 ? (
           <div className="text-center py-12 text-gray-500 border border-dashed rounded-lg bg-white">Không tìm thấy dữ liệu.</div>
         ) : (
-          filteredContracts.map((contract) => (
+          paginatedContracts.map((contract) => (
             <div key={contract.id} className="bg-white rounded-lg border border-gray-200 p-5 hover:shadow-md transition-all">
               <div className="flex items-start justify-between mb-4">
                 <div className="flex items-center gap-3">
@@ -304,6 +367,49 @@ export default function ContractManagement() {
           ))
         )}
       </div>
+
+      {/* Thanh Điều Hướng Phân Trang (Chỉ hiện khi tổng số trang lớn hơn 1) */}
+      {totalPages > 1 && (
+        <div className="flex items-center justify-between mt-6 border-t border-gray-200 pt-4">
+          <p className="text-sm text-gray-600">
+            Hiển thị từ <span className="font-medium">{startIndex + 1}</span> đến{' '}
+            <span className="font-medium">{Math.min(startIndex + itemsPerPage, totalItems)}</span> trong{' '}
+            <span className="font-medium">{totalItems}</span> hợp đồng.
+          </p>
+          <div className="flex gap-1">
+            <button
+              onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+              disabled={currentPage === 1}
+              className="px-3 py-1.5 border border-gray-300 rounded-md text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Trước
+            </button>
+            
+            {Array.from({ length: totalPages }, (_, idx) => idx + 1).map(pageNumber => (
+              <button
+                key={pageNumber}
+                onClick={() => setCurrentPage(pageNumber)}
+                className={`px-3 py-1.5 border text-sm font-medium rounded-md ${
+                  currentPage === pageNumber
+                    ? 'bg-blue-600 border-blue-600 text-white'
+                    : 'bg-white border-gray-300 text-gray-700 hover:bg-gray-50'
+                }`}
+              >
+                {pageNumber}
+              </button>
+            ))}
+
+            <button
+              onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+              disabled={currentPage === totalPages}
+              className="px-3 py-1.5 border border-gray-300 rounded-md text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Sau
+            </button>
+          </div>
+        </div>
+      )}
+
 
       {/* DIALOG CHI TIẾT HỢP ĐỒNG */}
       <Dialog.Root open={selectedContract !== null} onOpenChange={(open) => !open && setSelectedContract(null)}>
@@ -357,7 +463,7 @@ export default function ContractManagement() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="block font-medium mb-1 text-gray-700">Mã số hợp đồng <span className="text-red-500">*</span></label>
-                  <input type="text" value={createFormData.contractNumber} onChange={(e) => setCreateFormData({ ...createFormData, contractNumber: e.target.value })} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" required />
+                  <input type="text" value={createFormData.contractNumber} onChange={(e) => setCreateFormData({ ...createFormData, contractNumber: e.target.value })} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-black" required />
                 </div>
                 <div>
                   <label className="block font-medium mb-1 text-gray-700">Lựa chọn người thuê <span className="text-red-500">*</span></label>

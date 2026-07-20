@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useEffect, type ReactNode } from 'react';
-import { fetchApi } from '../utils/api';
+import { fetchApi } from '../api/fetchApi';
 
 interface User {
   id: string;
@@ -13,21 +13,11 @@ interface User {
   refreshToken: string;
 }
 
-interface RegisterData {
-  name: string;
-  email: string;
-  phoneNumber: string;
-  password: string;
-  confirmPassword: string;
-  role: number;
-}
-
 interface AuthContextType {
   user: User | null;
   isAuthenticated: boolean;
   isLoading: boolean;
   login: (email: string, password: string, rememberMe: boolean) => Promise<User>;
-  register: (data: RegisterData) => Promise<void>;
   logout: () => Promise<void>;
 }
 
@@ -37,7 +27,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
 
-  // SỬA: Phục hồi trạng thái đồng bộ hoàn toàn trước khi tắt trạng thái Loading
+  // Phục hồi trạng thái đăng nhập khi ứng dụng khởi chạy lần đầu
   useEffect(() => {
     try {
       const localUser = localStorage.getItem('user');
@@ -54,7 +44,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       localStorage.clear();
       sessionStorage.clear();
     } finally {
-      // Đảm bảo mọi thứ chạy xong mới tắt loading
+      // Đảm bảo mọi thứ chạy xong mới tắt trạng thái loading
       setIsLoading(false);
     }
   }, []);
@@ -93,21 +83,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return userData;
   };
 
-  const register = async (data: RegisterData): Promise<void> => {
-    const response = await fetchApi('/Auth/register', {
-      method: 'POST',
-      body: JSON.stringify(data),
-    });
-
-    if (!response.ok) {
-      const errorData = await response.text();
-      throw new Error(errorData || 'Đăng ký thất bại');
-    }
-
-    // SỬA CHỖ NÀY: Không ép kiểu response.json() của Register thành User
-    // Đăng ký xong nên điều hướng bắt họ đăng nhập lại hoặc trả về thông báo, tránh set bậy token lỗi vào state.
-  };
-
   const logout = async () => {
     try {
       await fetchApi('/Auth/logout', {
@@ -121,14 +96,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       localStorage.removeItem('token');
       sessionStorage.removeItem('user');
       sessionStorage.removeItem('token');
-      
-      // Xóa các dữ liệu phụ (như ID chat ở câu hỏi trước) để tránh rác storage
       localStorage.removeItem('active_chat_user_id');
     }
   };
 
   return (
-    <AuthContext.Provider value={{ user, isAuthenticated: !!user, isLoading, login, register, logout }}>
+    <AuthContext.Provider value={{ user, isAuthenticated: !!user, isLoading, login, logout }}>
       {children}
     </AuthContext.Provider>
   );

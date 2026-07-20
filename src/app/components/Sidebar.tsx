@@ -15,7 +15,7 @@ import {
   Wrench,
   LogOut
 } from 'lucide-react';
-import { useAuth } from '../../contexts/AuthContext';
+import { useAuth } from '../contexts/AuthContext';
 import { toast } from 'sonner';
 
 interface SidebarProps {
@@ -40,7 +40,7 @@ const menuItems = [
 export default function Sidebar({ open, onToggle }: SidebarProps) {
   const location = useLocation();
   const navigate = useNavigate();
-  const { logout, user } = useAuth();
+  const { logout } = useAuth();
 
   const handleLogout = () => {
     logout();
@@ -68,7 +68,7 @@ export default function Sidebar({ open, onToggle }: SidebarProps) {
         )}
       </div>
 
-      {open && user && (
+      {/* {open && user && (
         <div className="p-4 border-b border-gray-200">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
@@ -80,7 +80,7 @@ export default function Sidebar({ open, onToggle }: SidebarProps) {
             </div>
           </div>
         </div>
-      )}
+      )} */}
 
       <nav className="p-2 mt-4 flex-1 overflow-y-auto">
         {menuItems.map((item) => {

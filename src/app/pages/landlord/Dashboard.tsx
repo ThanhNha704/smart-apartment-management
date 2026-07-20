@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { Building2, Users, DollarSign, AlertCircle, Loader2 } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import { toast } from 'sonner';
-import { fetchApi } from '../../utils/api';
+import { fetchApi } from '../../api/fetchApi';
 
 // Định nghĩa Interface
 interface RevenueMonth {

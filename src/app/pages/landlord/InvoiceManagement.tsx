@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
-import { Search, Eye, QrCode, CheckCircle, Clock, XCircle, Trash2, Loader2 } from 'lucide-react';
+import { Search, Eye, QrCode, CheckCircle, Clock, XCircle, Trash2, Loader2, ChevronLeft, ChevronRight, ArrowUpDown } from 'lucide-react';
 import * as Dialog from '@radix-ui/react-dialog';
 import { toast } from 'sonner';
-import { fetchApi } from '../../utils/api';
+import { fetchApi } from '../../api/fetchApi';
 
 // Interface
 interface Invoice {
@@ -27,7 +27,6 @@ interface Invoice {
   note: string;
 }
 
-// Option thẻ select
 interface RoomOption { id: string; roomNumber: string; price: number; }
 interface TenantOption { id: string; name: string; }
 
@@ -52,6 +51,11 @@ export default function InvoiceManagement() {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState<string>('all');
 
+  // --- Cấu hình Phân trang & Sắp xếp ---
+  const [currentPage, setCurrentPage] = useState(1);
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc'); // asc = gần nhất đến xa nhất, desc = xa nhất đến gần nhất
+  const itemsPerPage = 10;
+
   // States Modal quản lý
   const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
   const [showQRDialog, setShowQRDialog] = useState(false);
@@ -59,12 +63,12 @@ export default function InvoiceManagement() {
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [invoiceToDelete, setInvoiceToDelete] = useState<Invoice | null>(null);
 
-  // Form State & Select State
+  // Form State
   const [selectedRoomId, setSelectedRoomId] = useState('');
   const [selectedTenantId, setSelectedTenantId] = useState('');
   const [createFormData, setCreateFormData] = useState(blankCreateFormData);
 
-  // Hàm GET: Tải tất cả hóa đơn, phòng và khách thuê
+  // Tải dữ liệu ban đầu
   const loadInitialData = async () => {
     try {
       setIsLoading(true);
@@ -100,7 +104,7 @@ export default function InvoiceManagement() {
     }
   }, [selectedRoomId, rooms]);
 
-  // Tự động điền tên khách thuê khi chọn từ danh sách
+  // Tự động điền tên khách thuê
   useEffect(() => {
     const activeTenant = tenants.find(t => t.id === selectedTenantId);
     if (activeTenant) {
@@ -108,7 +112,12 @@ export default function InvoiceManagement() {
     }
   }, [selectedTenantId, tenants]);
 
-  // Hàm POST: Gửi dữ liệu tạo hóa đơn mới
+  // Reset trang về 1 khi tìm kiếm hoặc lọc
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, filterStatus]);
+
+  // Hàm POST: Tạo hóa đơn mới
   const handleCreateInvoice = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!createFormData.roomNumber || !createFormData.tenantName || !createFormData.dueDate) {
@@ -156,7 +165,7 @@ export default function InvoiceManagement() {
     }
   };
 
-  // Hàm PUT: Cập nhật trạng thái thanh toán
+  // Hàm PUT: Xác nhận thanh toán
   const handlePayInvoice = async (id: string) => {
     try {
       const response = await fetchApi(`/Invoices/${id}/pay`, { method: 'PUT' });
@@ -171,7 +180,7 @@ export default function InvoiceManagement() {
     }
   };
 
-  // Hàm DELETE: Gỡ bỏ hóa đơn
+  // Hàm DELETE: Xóa hóa đơn
   const handleDeleteInvoice = async () => {
     if (!invoiceToDelete) return;
     try {
@@ -187,13 +196,33 @@ export default function InvoiceManagement() {
     }
   };
 
-  const filteredInvoices = invoices.filter(invoice => {
-    const matchesSearch = (invoice.invoiceNumber?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
-      (invoice.tenantName?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
-      (invoice.roomNumber?.toLowerCase() || '').includes(searchTerm.toLowerCase());
-    const matchesFilter = filterStatus === 'all' || String(invoice.status) === filterStatus;
-    return matchesSearch && matchesFilter;
-  });
+  // --- Xử lý Tìm kiếm, Lọc, Sắp xếp nâng cao ---
+  const filteredAndSortedInvoices = invoices
+    .filter(invoice => {
+      const matchesSearch = (invoice.invoiceNumber?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
+        (invoice.tenantName?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
+        (invoice.roomNumber?.toLowerCase() || '').includes(searchTerm.toLowerCase());
+      const matchesFilter = filterStatus === 'all' || String(invoice.status) === filterStatus;
+      return matchesSearch && matchesFilter;
+    })
+    .sort((a, b) => {
+      // 1. Sắp xếp theo Kỳ hạn (dueDate)
+      const dateA = new Date(a.dueDate).getTime() || 0;
+      const dateB = new Date(b.dueDate).getTime() || 0;
+      
+      if (dateA !== dateB) {
+        return sortOrder === 'asc' ? dateA - dateB : dateB - dateA;
+      }
+      
+      // 2. Nếu trùng kỳ hạn, ưu tiên xếp theo số phòng tăng dần (P101, P102...)
+      return (a.roomNumber || '').localeCompare(b.roomNumber || '', undefined, { numeric: true, sensitivity: 'base' });
+    });
+
+  // Tính toán dữ liệu phân trang dựa trên danh sách đã sắp xếp
+  const totalItems = filteredAndSortedInvoices.length;
+  const totalPages = Math.ceil(totalItems / itemsPerPage) || 1;
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const paginatedInvoices = filteredAndSortedInvoices.slice(startIndex, startIndex + itemsPerPage);
 
   const getStatusBadge = (status: number, label: string) => {
     const configs = {
@@ -218,7 +247,7 @@ export default function InvoiceManagement() {
         <p className="text-gray-600">Quản lý và theo dõi các hóa đơn thanh toán</p>
       </div>
 
-      {/* Tìm kiếm & Bộ lọc */}
+      {/* Thanh công cụ: Tìm kiếm, Bộ lọc & Nút sắp xếp */}
       <div className="bg-white rounded-lg border border-gray-200 mb-6 p-4 flex flex-col md:flex-row gap-4">
         <div className="flex-1 relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
@@ -227,10 +256,20 @@ export default function InvoiceManagement() {
             placeholder="Tìm kiếm hóa đơn, số phòng, người thuê..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+            className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-black text-sm"
           />
         </div>
         <div className="flex gap-2">
+          {/* Nút chức năng sắp xếp nhanh */}
+          <button
+            onClick={() => setSortOrder(prev => prev === 'asc' ? 'desc' : 'asc')}
+            className="px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white hover:bg-gray-50 text-gray-700 flex items-center gap-2 font-medium transition-colors"
+            title="Thay đổi thứ tự sắp xếp theo kỳ hạn"
+          >
+            <ArrowUpDown className="w-4 h-4 text-gray-500" />
+            <span>Kỳ hạn: {sortOrder === 'asc' ? 'Gần nhất' : 'Xa nhất'}</span>
+          </button>
+
           <select
             value={filterStatus}
             onChange={(e) => setFilterStatus(e.target.value)}
@@ -241,17 +280,11 @@ export default function InvoiceManagement() {
             <option value="0">Chờ thanh toán</option>
             <option value="2">Quá hạn</option>
           </select>
-          {/* <button
-            onClick={() => setIsCreateDialogOpen(true)}
-            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center gap-2 text-sm font-medium transition-colors shrink-0"
-          >
-            <Plus className="w-5 h-5" /> Tạo hóa đơn
-          </button> */}
         </div>
       </div>
 
-      {/* Bảng dữ liệu */}
-      <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
+      {/* Bảng dữ liệu & Phân trang */}
+      <div className="bg-white rounded-lg border border-gray-200 overflow-hidden shadow-sm">
         <div className="overflow-x-auto">
           {isLoading ? (
             <div className="flex flex-col items-center justify-center py-20 gap-2 text-gray-500">
@@ -259,50 +292,95 @@ export default function InvoiceManagement() {
               <p className="text-sm">Đang đồng bộ dữ liệu hóa đơn...</p>
             </div>
           ) : (
-            <table className="w-full text-sm">
-              <thead className="bg-gray-50 border-b border-gray-200 text-gray-500 font-medium">
-                <tr>
-                  <th className="px-6 py-3 text-left">Mã hóa đơn</th>
-                  <th className="px-6 py-3 text-left">Phòng</th>
-                  <th className="px-6 py-3 text-left">Người thuê</th>
-                  <th className="px-6 py-3 text-left">Kỳ hạn</th>
-                  <th className="px-6 py-3 text-left">Tổng tiền cần thu</th>
-                  <th className="px-6 py-3 text-left">Hạn đóng tiền</th>
-                  <th className="px-6 py-3 text-left">Trạng thái</th>
-                  <th className="px-6 py-3 text-center">Thao tác</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-200 text-gray-700">
-                {filteredInvoices.length === 0 ? (
+            <>
+              <table className="w-full text-sm">
+                <thead className="bg-gray-50 border-b border-gray-200 text-gray-500 font-medium">
                   <tr>
-                    <td colSpan={8} className="px-6 py-12 text-center text-gray-500 border-dashed">Không có hóa đơn tương thích.</td>
+                    <th className="px-6 py-3 text-left">Mã hóa đơn</th>
+                    <th className="px-6 py-3 text-left">Phòng</th>
+                    <th className="px-6 py-3 text-left">Người thuê</th>
+                    <th className="px-6 py-3 text-left">Kỳ hạn</th>
+                    <th className="px-6 py-3 text-left">Tổng tiền cần thu</th>
+                    <th className="px-6 py-3 text-left">Hạn đóng tiền</th>
+                    <th className="px-6 py-3 text-left">Trạng thái</th>
+                    <th className="px-6 py-3 text-center">Thao tác</th>
                   </tr>
-                ) : (
-                  filteredInvoices.map((invoice) => (
-                    <tr key={invoice.id} className="hover:bg-gray-50 transition-colors">
-                      <td className="px-6 py-4 font-mono font-medium">{invoice.invoiceNumber || `ID: ${invoice.id.slice(0, 8)}`}</td>
-                      <td className="px-6 py-4 font-semibold">Phòng {invoice.roomNumber}</td>
-                      <td className="px-6 py-4">{invoice.tenantName}</td>
-                      <td className="px-6 py-4">{invoice.billingPeriod}</td>
-                      <td className="px-6 py-4 text-blue-600 font-semibold">{(invoice.amount || 0).toLocaleString('vi-VN')} ₫</td>
-                      <td className="px-6 py-4 text-gray-500">{invoice.dueDate ? new Date(invoice.dueDate).toLocaleDateString('vi-VN') : '---'}</td>
-                      <td className="px-6 py-4">{getStatusBadge(invoice.status, invoice.statusLabel)}</td>
-                      <td className="px-6 py-4">
-                        <div className="flex items-center justify-center gap-1">
-                          <button onClick={() => setSelectedInvoice(invoice)} className="p-2 hover:bg-gray-100 text-gray-600 rounded-md" title="Xem chi tiết"><Eye className="w-4 h-4" /></button>
-                          <button onClick={() => { setSelectedInvoice(invoice); setShowQRDialog(true); }} className="p-2 hover:bg-gray-100 text-gray-600 rounded-md" title="Mã QR Pay"><QrCode className="w-4 h-4" /></button>
-                          <button onClick={() => { setInvoiceToDelete(invoice); setIsDeleteDialogOpen(true); }} className="p-2 hover:bg-gray-100 text-red-600 rounded-md" title="Xóa bỏ"><Trash2 className="w-4 h-4" /></button>
-                        </div>
-                      </td>
+                </thead>
+                <tbody className="divide-y divide-gray-200 text-gray-700">
+                  {paginatedInvoices.length === 0 ? (
+                    <tr>
+                      <td colSpan={8} className="px-6 py-12 text-center text-gray-500 border-dashed">Không có hóa đơn tương thích.</td>
                     </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
+                  ) : (
+                    paginatedInvoices.map((invoice) => (
+                      <tr key={invoice.id} className="hover:bg-gray-50 transition-colors">
+                        <td className="px-6 py-4 font-mono font-medium">{invoice.invoiceNumber || `ID: ${invoice.id.slice(0, 8)}`}</td>
+                        <td className="px-6 py-4 font-semibold">Phòng {invoice.roomNumber}</td>
+                        <td className="px-6 py-4">{invoice.tenantName}</td>
+                        <td className="px-6 py-4">{invoice.billingPeriod}</td>
+                        <td className="px-6 py-4 text-blue-600 font-semibold">{(invoice.amount || 0).toLocaleString('vi-VN')} ₫</td>
+                        <td className="px-6 py-4 text-gray-500">{invoice.dueDate ? new Date(invoice.dueDate).toLocaleDateString('vi-VN') : '---'}</td>
+                        <td className="px-6 py-4">{getStatusBadge(invoice.status, invoice.statusLabel)}</td>
+                        <td className="px-6 py-4">
+                          <div className="flex items-center justify-center gap-1">
+                            <button onClick={() => setSelectedInvoice(invoice)} className="p-2 hover:bg-gray-100 text-gray-600 rounded-md" title="Xem chi tiết"><Eye className="w-4 h-4" /></button>
+                            <button onClick={() => { setSelectedInvoice(invoice); setShowQRDialog(true); }} className="p-2 hover:bg-gray-100 text-gray-600 rounded-md" title="Mã QR Pay"><QrCode className="w-4 h-4" /></button>
+                            <button onClick={() => { setInvoiceToDelete(invoice); setIsDeleteDialogOpen(true); }} className="p-2 hover:bg-gray-100 text-red-600 rounded-md" title="Xóa bỏ"><Trash2 className="w-4 h-4" /></button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+
+              {/* Thanh điều hướng Phân trang */}
+              {totalItems > 0 && (
+                <div className="px-6 py-4 bg-gray-50 border-t border-gray-200 flex items-center justify-between text-sm text-gray-600 select-none">
+                  <div>
+                    Hiển thị <span className="font-medium">{startIndex + 1}</span> đến{' '}
+                    <span className="font-medium">{Math.min(startIndex + itemsPerPage, totalItems)}</span> trong tổng số{' '}
+                    <span className="font-medium">{totalItems}</span> hóa đơn
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                      disabled={currentPage === 1}
+                      className="p-2 border border-gray-300 rounded-md bg-white hover:bg-gray-50 text-gray-700 disabled:opacity-50 disabled:hover:bg-white transition-colors"
+                    >
+                      <ChevronLeft className="w-4 h-4" />
+                    </button>
+                    <div className="flex items-center gap-1">
+                      {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+                        <button
+                          key={page}
+                          onClick={() => setCurrentPage(page)}
+                          className={`w-8 h-8 rounded-md border text-xs font-medium transition-colors ${
+                            currentPage === page
+                              ? 'bg-blue-600 text-white border-blue-600'
+                              : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+                          }`}
+                        >
+                          {page}
+                        </button>
+                      ))}
+                    </div>
+                    <button
+                      onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                      disabled={currentPage === totalPages}
+                      className="p-2 border border-gray-300 rounded-md bg-white hover:bg-gray-50 text-gray-700 disabled:opacity-50 disabled:hover:bg-white transition-colors"
+                    >
+                      <ChevronRight className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+              )}
+            </>
           )}
         </div>
       </div>
 
+      {/* --- Các component Dialog (Được giữ nguyên toàn bộ logic cũ) --- */}
       {/* Dialog Chi Tiết Hóa Đơn & Xác Nhận Thanh Toán */}
       <Dialog.Root open={selectedInvoice !== null && !showQRDialog} onOpenChange={(open) => !open && setSelectedInvoice(null)}>
         <Dialog.Portal>
@@ -378,7 +456,7 @@ export default function InvoiceManagement() {
         </Dialog.Portal>
       </Dialog.Root>
 
-      {/* Dialog Lập Hóa Đơn Mới (POST) */}
+      {/* Dialog Lập Hóa Đơn Mới */}
       <Dialog.Root open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
         <Dialog.Portal>
           <Dialog.Overlay className="fixed inset-0 bg-black/50 z-40" />
@@ -456,7 +534,7 @@ export default function InvoiceManagement() {
         </Dialog.Portal>
       </Dialog.Root>
 
-      {/* Dialog Hỏi Xác Nhận Xóa Hóa Đơn (DELETE) */}
+      {/* Dialog Hỏi Xác Nhận Xóa Hóa Đơn */}
       <Dialog.Root open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
         <Dialog.Portal>
           <Dialog.Overlay className="fixed inset-0 bg-black/50 z-50" />

@@ -15,7 +15,7 @@ import {
   MessageSquare
 } from 'lucide-react';
 import { toast } from 'sonner';
-import { fetchApi } from '../../utils/api';
+import { fetchApi } from '../../api/fetchApi';
 
 // INTERFACES
 interface NotificationItem {
@@ -297,7 +297,7 @@ export default function NotificationManagement() {
             placeholder="Tìm kiếm thông báo, tiêu đề, nội dung..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-9 pr-4 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="w-full pl-9 pr-4 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-black"
           />
         </div>
         <div className="flex gap-2 w-full md:w-auto">
@@ -453,7 +453,7 @@ export default function NotificationManagement() {
                 <select
                   value={tenantId}
                   onChange={(e) => setTenantId(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none bg-white"
+                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-1 focus:ring-black focus:outline-none bg-white"
                 >
                   <option value="">Gửi cho tất cả mọi người</option>
                   {users.map((u) => (
@@ -472,7 +472,7 @@ export default function NotificationManagement() {
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
                   placeholder="Tiêu đề chính..."
-                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-1 focus:ring-black focus:outline-none"
                 />
               </div>
 
@@ -486,7 +486,7 @@ export default function NotificationManagement() {
                   value={body}
                   onChange={(e) => setBody(e.target.value)}
                   placeholder="Nhập nội dung gửi..."
-                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none resize-none"
+                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-1 focus:ring-black focus:outline-none resize-none"
                 />
               </div>
 
@@ -497,7 +497,7 @@ export default function NotificationManagement() {
                   <select
                     value={type}
                     onChange={(e) => setType(Number(e.target.value))}
-                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none bg-white"
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-1 focus:ring-black focus:outline-none bg-white"
                   >
                     <option value={0}>Hệ thống</option>
                     <option value={1}>Hóa đơn</option>
@@ -510,7 +510,7 @@ export default function NotificationManagement() {
                   <select
                     value={refModel}
                     onChange={(e) => setRefModel(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none bg-white"
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-1 focus:ring-black focus:outline-none bg-white"
                   >
                     <option value="">-- Không liên kết --</option>
                     <option value="Message">Tin nhắn (Message)</option>
@@ -531,14 +531,14 @@ export default function NotificationManagement() {
                     value={metaKey}
                     onChange={(e) => setMetaKey(e.target.value)}
                     placeholder="Key (ví dụ: source)"
-                    className="w-1/2 px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                    className="w-1/2 px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-1 focus:ring-black focus:outline-none"
                   />
                   <input
                     type="text"
                     value={metaValue}
                     onChange={(e) => setMetaValue(e.target.value)}
                     placeholder="Value (ví dụ: system_alert)"
-                    className="w-1/2 px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                    className="w-1/2 px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-1 focus:ring-black focus:outline-none"
                   />
                 </div>
               </div>

@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
-import { Plus, Search, Edit, Trash2, Users, DoorOpen, Loader2 } from 'lucide-react';
+import { Plus, Search, Edit, Trash2, Users, DoorOpen, Loader2, ChevronLeft, ChevronRight, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
 import * as Dialog from '@radix-ui/react-dialog';
 import { toast } from 'sonner';
-import { fetchApi } from '../../utils/api';
+import { fetchApi } from '../../api/fetchApi';
 
 // Định nghĩa trạng thái phòng
 const RoomStatus = {
@@ -12,6 +12,10 @@ const RoomStatus = {
 } as const;
 
 type RoomStatus = typeof RoomStatus[keyof typeof RoomStatus];
+
+// Tiêu chí sắp xếp
+type SortKey = 'price' | 'roomDeposit' | 'area' | 'floorNumber' | 'maxOccupants' | '';
+type SortDirection = 'asc' | 'desc';
 
 // Interface
 interface Room {
@@ -30,7 +34,6 @@ interface Room {
   tenantName: string | null;
 }
 
-// Interface của Floor
 interface FloorItem {
   id: string;
   floorNumber: number;
@@ -39,7 +42,6 @@ interface FloorItem {
   roomCount: number;
 }
 
-// Interface của User/Tenant
 interface UserItem {
   id: string;
   name: string;
@@ -57,6 +59,12 @@ export default function RoomManagement() {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState<string>('all');
 
+  // --- THÊM STATE CHO SẮP XẾP & PHÂN TRANG ---
+  const [sortKey, setSortKey] = useState<SortKey>('');
+  const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
+  const [currentPage, setCurrentPage] = useState<number>(1);
+  const [itemsPerPage] = useState<number>(6); // Mỗi trang hiển thị 6 phòng
+
   // Trạng thái đóng/mở Dialog
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
@@ -65,7 +73,7 @@ export default function RoomManagement() {
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [roomToDelete, setRoomToDelete] = useState<string | null>(null);
 
-  // State quản lý Form phòng (Thêm / Sửa)
+  // State quản lý Form phòng
   const [roomFormData, setRoomFormData] = useState({
     roomNumber: '',
     price: 0,
@@ -86,11 +94,10 @@ export default function RoomManagement() {
     price: 0
   });
 
-  // Hàm GET: Lấy tất cả dữ liệu cần thiết
+  // Hàm GET dữ liệu
   const fetchData = async () => {
     try {
       setLoading(true);
-
       const roomsRes = await fetchApi('/Rooms');
       if (!roomsRes.ok) throw new Error('Không thể tải danh sách phòng');
       const roomsData = await roomsRes.json();
@@ -117,7 +124,12 @@ export default function RoomManagement() {
     fetchData();
   }, []);
 
-  // Hàm POST: Xử lý Thêm phòng mới
+  // Reset về trang 1 nếu người dùng tìm kiếm hoặc đổi bộ lọc
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, filterStatus, sortKey, sortDirection]);
+
+  // Hàm POST: Thêm phòng mới
   const handleCreateRoom = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!roomFormData.floorId) {
@@ -146,7 +158,7 @@ export default function RoomManagement() {
     }
   };
 
-  // Hàm PUT: Xử lý Sửa thông tin phòng
+  // Hàm PUT: Sửa thông tin phòng
   const handleSaveEdit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedRoom) return;
@@ -177,7 +189,7 @@ export default function RoomManagement() {
     }
   };
 
-  // Hàm POST: Xử lý Lập hợp đồng & Cho thuê phòng
+  // Hàm POST: Kích hoạt hợp đồng
   const handleSaveRent = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedRoom) return;
@@ -271,12 +283,38 @@ export default function RoomManagement() {
     setIsRentDialogOpen(true);
   };
 
-  const filteredRooms = rooms.filter(room => {
-    const matchesSearch = room.roomNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (room.tenantName && room.tenantName.toLowerCase().includes(searchTerm.toLowerCase()));
-    const matchesFilter = filterStatus === 'all' || room.status.toString() === filterStatus;
-    return matchesSearch && matchesFilter;
-  });
+  // --- XỬ LÝ LỌC & SẮP XẾP DỮ LIỆU ---
+  const handleSort = (key: SortKey) => {
+    if (sortKey === key) {
+      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortKey(key);
+      setSortDirection('asc');
+    }
+  };
+
+  const processedRooms = rooms
+    .filter(room => {
+      const matchesSearch = room.roomNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (room.tenantName && room.tenantName.toLowerCase().includes(searchTerm.toLowerCase()));
+      const matchesFilter = filterStatus === 'all' || room.status.toString() === filterStatus;
+      return matchesSearch && matchesFilter;
+    })
+    .sort((a, b) => {
+      if (!sortKey) return 0;
+      const valA = a[sortKey];
+      const valB = b[sortKey];
+
+      if (valA < valB) return sortDirection === 'asc' ? -1 : 1;
+      if (valA > valB) return sortDirection === 'asc' ? 1 : -1;
+      return 0;
+    });
+
+  // --- LOGIC PHÂN TRANG ---
+  const totalItems = processedRooms.length;
+  const totalPages = Math.ceil(totalItems / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const paginatedRooms = processedRooms.slice(startIndex, startIndex + itemsPerPage);
 
   const getStatusBadge = (status: RoomStatus, label?: string) => {
     const styles = {
@@ -305,8 +343,8 @@ export default function RoomManagement() {
         <p className="text-gray-600">Quản lí phòng ở tòa nhà của bạn</p>
       </div>
 
-      {/* Tìm kiếm và Thêm mới */}
-      <div className="bg-white rounded-lg border border-gray-200 mb-6 p-4">
+      {/* Bộ lọc, Tìm kiếm & Sắp xếp */}
+      <div className="bg-white rounded-lg border border-gray-200 mb-6 p-4 space-y-4">
         <div className="flex flex-col md:flex-row gap-4">
           <div className="flex-1 relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
@@ -315,14 +353,14 @@ export default function RoomManagement() {
               placeholder="Tìm số phòng, tên khách..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-black text-sm"
             />
           </div>
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             <select
               value={filterStatus}
               onChange={(e) => setFilterStatus(e.target.value)}
-              className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-black text-sm bg-white"
             >
               <option value="all">Tất cả trạng thái</option>
               <option value={RoomStatus.Vacant}>Phòng trống</option>
@@ -342,11 +380,50 @@ export default function RoomManagement() {
                 });
                 setIsAddDialogOpen(true);
               }}
-              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center gap-2"
+              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center gap-2 text-sm font-medium"
             >
-              <Plus className="w-5 h-5" /> Thêm phòng
+              <Plus className="w-4 h-4" /> Thêm phòng
             </button>
           </div>
+        </div>
+
+        {/* --- THANH CHỨC NĂNG SẮP XẾP TÍNH HỢP --- */}
+        <div className="pt-3 border-t border-gray-100 flex flex-wrap items-center gap-2 text-sm text-gray-600">
+          <span className="font-medium mr-2">Sắp xếp theo:</span>
+          {[
+            { key: 'price', label: 'Giá thuê' },
+            { key: 'roomDeposit', label: 'Tiền cọc' },
+            { key: 'area', label: 'Diện tích' },
+            { key: 'floorNumber', label: 'Số tầng' },
+            { key: 'maxOccupants', label: 'Sức chứa' },
+          ].map((item) => {
+            const isActive = sortKey === item.key;
+            return (
+              <button
+                key={item.key}
+                onClick={() => handleSort(item.key as SortKey)}
+                className={`px-3 py-1.5 rounded-md border flex items-center gap-1.5 transition-colors ${isActive
+                    ? 'bg-blue-50 border-blue-200 text-blue-700 font-medium'
+                    : 'border-gray-200 bg-gray-50 hover:bg-gray-100 text-gray-700'
+                  }`}
+              >
+                {item.label}
+                {isActive ? (
+                  sortDirection === 'asc' ? <ArrowUp className="w-3.5 h-3.5" /> : <ArrowDown className="w-3.5 h-3.5" />
+                ) : (
+                  <ArrowUpDown className="w-3.5 h-3.5 text-gray-400" />
+                )}
+              </button>
+            );
+          })}
+          {sortKey && (
+            <button
+              onClick={() => setSortKey('')}
+              className="text-xs text-red-500 hover:underline ml-auto"
+            >
+              Xóa bộ xếp
+            </button>
+          )}
         </div>
       </div>
 
@@ -357,93 +434,131 @@ export default function RoomManagement() {
           <p className="text-sm text-gray-500">Đang tải thông tin từ máy chủ...</p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {filteredRooms.map((room) => (
-            <div key={room.id} className="bg-white rounded-lg border border-gray-200 p-5 hover:shadow-lg transition-shadow flex flex-col justify-between h-full">
-              {/* Phần thông tin chính ở trên */}
-              <div>
-                <div className="flex items-start justify-between mb-4">
+        <>
+          {/* Danh sách phòng đã phân trang */}
+          {paginatedRooms.length === 0 ? (
+            <div className="text-center py-12 bg-white rounded-lg border border-gray-200">
+              <p className="text-gray-500 text-sm">Không tìm thấy phòng phù hợp với tiêu chí lọc.</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {paginatedRooms.map((room) => (
+                <div key={room.id} className="bg-white rounded-lg border border-gray-200 p-5 hover:shadow-lg transition-shadow flex flex-col justify-between h-full">
                   <div>
-                    <h3 className="text-xl font-semibold mb-1">{room.roomNumber}</h3>
-                    <p className="text-gray-400 text-xs">
-                      {floors.find(f => f.floorNumber === room.floorNumber)?.name || `Tầng ${room.floorNumber}`}
-                    </p>
+                    <div className="flex items-start justify-between mb-4">
+                      <div>
+                        <h3 className="text-xl font-semibold mb-1">{room.roomNumber}</h3>
+                        <p className="text-gray-400 text-xs">
+                          {floors.find(f => f.floorNumber === room.floorNumber)?.name || `Tầng ${room.floorNumber}`}
+                        </p>
+                      </div>
+                      {getStatusBadge(room.status, room.statusLabel)}
+                    </div>
+
+                    <div className="space-y-2 mb-4">
+                      <div className="flex items-center justify-between text-sm">
+                        <span className="text-gray-600">Diện tích / Sức chứa</span>
+                        <span className="font-medium">{room.area}m² - Tối đa {room.maxOccupants} người</span>
+                      </div>
+                      <div className="flex items-center justify-between text-sm">
+                        <span className="text-gray-600">Giá thuê</span>
+                        <span className="font-medium text-blue-600">{room.price.toLocaleString('vi-VN')} ₫</span>
+                      </div>
+                      <div className="flex items-center justify-between text-sm">
+                        <span className="text-gray-600">Tiền đặt cọc</span>
+                        <span className="font-medium">{room.roomDeposit.toLocaleString('vi-VN')} ₫</span>
+                      </div>
+                    </div>
                   </div>
-                  {getStatusBadge(room.status, room.statusLabel)}
+
+                  <div className="border-t border-gray-100 pt-2 mb-4 min-h-[56px] flex flex-col justify-center">
+                    {room.description ? (
+                      <p className="text-xs text-gray-500 italic line-clamp-1 mb-1">Ghi chú: {room.description}</p>
+                    ) : null}
+
+                    {room.status === RoomStatus.Occupied && room.tenantName ? (
+                      <div className="flex items-center gap-2 text-sm pt-1">
+                        <Users className="w-4 h-4 text-gray-400" />
+                        <span className="text-gray-900 font-medium line-clamp-1">Khách thuê: {room.tenantName}</span>
+                      </div>
+                    ) : null}
+                  </div>
+
+                  <div className="flex gap-2 pt-4 border-t border-gray-100 mt-auto">
+                    {room.status === RoomStatus.Vacant ? (
+                      <>
+                        <button
+                          onClick={() => openRentModal(room)}
+                          className="flex-1 px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center justify-center gap-2 text-sm font-medium"
+                        >
+                          <DoorOpen className="w-4 h-4" /> Cho thuê
+                        </button>
+                        <button
+                          onClick={() => openEditModal(room)}
+                          className="flex-1 px-3 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 flex items-center justify-center gap-2 text-sm font-medium"
+                        >
+                          <Edit className="w-4 h-4" /> Sửa
+                        </button>
+                        <button
+                          onClick={() => openDeleteModal(room.id)}
+                          className="flex-1 px-3 py-2 border border-red-300 text-red-600 rounded-lg hover:bg-red-50 flex items-center justify-center gap-2 text-sm font-medium"
+                        >
+                          <Trash2 className="w-4 h-4" /> Xóa
+                        </button>
+                      </>
+                    ) : (
+                      // Khi phòng đã được thuê: Không hiển thị nút bấm nào cả, chỉ hiện trạng thái text mờ
+                      <div className="flex-1 text-center py-2 text-sm font-medium text-gray-400 bg-gray-50 rounded-lg select-none">
+                        Phòng đang được thuê
+                      </div>
+                    )}
+                  </div>
                 </div>
+              ))}
+            </div>
+          )}
 
-                <div className="space-y-2 mb-4">
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-gray-600">Diện tích / Sức chứa</span>
-                    <span className="font-medium">{room.area}m² - Tối đa {room.maxOccupants} người</span>
-                  </div>
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-gray-600">Giá thuê</span>
-                    <span className="font-medium text-blue-600">{room.price.toLocaleString('vi-VN')} ₫</span>
-                  </div>
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-gray-600">Tiền đặt cọc</span>
-                    <span className="font-medium">{room.roomDeposit.toLocaleString('vi-VN')} ₫</span>
-                  </div>
-                </div>
+          {/* --- GIAO DIỆN PHÂN TRANG (PAGINATION) --- */}
+          {totalPages > 1 && (
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mt-6 bg-white border border-gray-200 rounded-lg p-4">
+              <div className="text-sm text-gray-600">
+                Hiển thị từ <span className="font-medium">{startIndex + 1}</span> đến{' '}
+                <span className="font-medium">{Math.min(startIndex + itemsPerPage, totalItems)}</span> trong tổng số{' '}
+                <span className="font-medium">{totalItems}</span> phòng
               </div>
-
-              {/* Phần thông tin phụ */}
-              <div className="border-t border-gray-100 pt-2 mb-4 min-h-[56px] flex flex-col justify-center">
-                {room.description ? (
-                  <p className="text-xs text-gray-500 italic line-clamp-1 mb-1">Ghi chú: {room.description}</p>
-                ) : null}
-
-                {room.status === RoomStatus.Occupied && room.tenantName ? (
-                  <div className="flex items-center gap-2 text-sm pt-1">
-                    <Users className="w-4 h-4 text-gray-400" />
-                    <span className="text-gray-900 font-medium line-clamp-1">Khách thuê: {room.tenantName}</span>
-                  </div>
-                ) : null}
-              </div>
-
-              {/* Phần nút chức năng */}
-              <div className="flex gap-2 pt-4 border-t border-gray-100 mt-auto">
-                {room.status === RoomStatus.Vacant ? (
-                  <>
-                    {/* Nút Cho thuê */}
-                    <button
-                      onClick={() => openRentModal(room)}
-                      className="flex-1 px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center justify-center gap-2 text-sm font-medium"
-                    >
-                      <DoorOpen className="w-4 h-4" /> Cho thuê
-                    </button>
-
-                    {/* Nút Sửa */}
-                    <button
-                      onClick={() => openEditModal(room)}
-                      className="flex-1 px-3 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 flex items-center justify-center gap-2 text-sm font-medium"
-                    >
-                      <Edit className="w-4 h-4" /> Sửa
-                    </button>
-
-                    {/* Nút Xóa */}
-                    <button
-                      onClick={() => openDeleteModal(room.id)}
-                      className="flex-1 px-3 py-2 border border-red-300 text-red-600 rounded-lg hover:bg-red-50 flex items-center justify-center gap-2 text-sm font-medium"
-                    >
-                      <Trash2 className="w-4 h-4" /> Xóa
-                    </button>
-                  </>
-                ) : (
-                  /* Nút Xóa duy nhất (Khi phòng đã được thuê hoặc đang bảo trì) */
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                  disabled={currentPage === 1}
+                  className="p-2 border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:hover:bg-transparent"
+                >
+                  <ChevronLeft className="w-4 h-4" />
+                </button>
+                {Array.from({ length: totalPages }, (_, i) => i + 1).map(page => (
                   <button
-                    onClick={() => openDeleteModal(room.id)}
-                    className="flex-1 px-3 py-2 border border-red-300 text-red-600 rounded-lg hover:bg-red-50 flex items-center justify-center gap-2 text-sm font-medium"
+                    key={page}
+                    onClick={() => setCurrentPage(page)}
+                    className={`px-3.5 py-1.5 rounded-lg text-sm font-medium border ${currentPage === page
+                        ? 'bg-blue-600 border-blue-600 text-white'
+                        : 'border-gray-300 bg-white hover:bg-gray-50 text-gray-700'
+                      }`}
                   >
-                    <Trash2 className="w-4 h-4" /> Xóa
+                    {page}
                   </button>
-                )}
+                ))}
+                <button
+                  onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                  disabled={currentPage === totalPages}
+                  className="p-2 border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:hover:bg-transparent"
+                >
+                  <ChevronRight className="w-4 h-4" />
+                </button>
               </div>
             </div>
-          ))}
-        </div>
+          )}
+        </>
       )}
+
       {/* Dialog Thêm phòng */}
       <Dialog.Root open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
         <Dialog.Portal>
@@ -453,13 +568,13 @@ export default function RoomManagement() {
             <form className="space-y-4" onSubmit={handleCreateRoom}>
               <div>
                 <label className="block text-sm font-medium mb-1">Số phòng</label>
-                <input type="text" className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" value={roomFormData.roomNumber} onChange={(e) => setRoomFormData({ ...roomFormData, roomNumber: e.target.value })} placeholder="P101" required />
+                <input type="text" className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-black" value={roomFormData.roomNumber} onChange={(e) => setRoomFormData({ ...roomFormData, roomNumber: e.target.value })} placeholder="P101" required />
               </div>
               <div className="grid grid-cols-2 gap-2">
                 <div>
                   <label className="block text-sm font-medium mb-1">Chọn Tầng</label>
                   <select
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-1 focus:ring-black"
                     value={roomFormData.floorId}
                     onChange={(e) => setRoomFormData({ ...roomFormData, floorId: e.target.value })}
                     required
@@ -472,26 +587,26 @@ export default function RoomManagement() {
                 </div>
                 <div>
                   <label className="block text-sm font-medium mb-1">Số người tối đa</label>
-                  <input type="number" className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" value={roomFormData.maxOccupants} onChange={(e) => setRoomFormData({ ...roomFormData, maxOccupants: Number(e.target.value) })} min={1} required />
+                  <input type="number" className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-black" value={roomFormData.maxOccupants} onChange={(e) => setRoomFormData({ ...roomFormData, maxOccupants: Number(e.target.value) })} min={1} required />
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-2">
                 <div>
                   <label className="block text-sm font-medium mb-1">Diện tích (m²)</label>
-                  <input type="number" step="any" className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" value={roomFormData.area} onChange={(e) => setRoomFormData({ ...roomFormData, area: Number(e.target.value) })} min={1} required />
+                  <input type="number" step="any" className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-black" value={roomFormData.area} onChange={(e) => setRoomFormData({ ...roomFormData, area: Number(e.target.value) })} min={1} required />
                 </div>
                 <div>
                   <label className="block text-sm font-medium mb-1">Giá thuê (VNĐ)</label>
-                  <input type="number" className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" value={roomFormData.price} onChange={(e) => setRoomFormData({ ...roomFormData, price: Number(e.target.value) })} min={1} required />
+                  <input type="number" className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-black" value={roomFormData.price} onChange={(e) => setRoomFormData({ ...roomFormData, price: Number(e.target.value) })} min={1} required />
                 </div>
               </div>
               <div>
                 <label className="block text-sm font-medium mb-1">Tiền đặt cọc</label>
-                <input type="number" className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" value={roomFormData.roomDeposit} onChange={(e) => setRoomFormData({ ...roomFormData, roomDeposit: Number(e.target.value) })} min={0} required />
+                <input type="number" className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-black" value={roomFormData.roomDeposit} onChange={(e) => setRoomFormData({ ...roomFormData, roomDeposit: Number(e.target.value) })} min={0} required />
               </div>
               <div>
                 <label className="block text-sm font-medium mb-1">Mô tả phòng</label>
-                <textarea className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" rows={2} value={roomFormData.description} onChange={(e) => setRoomFormData({ ...roomFormData, description: e.target.value })} placeholder="Vị trí, trang thiết bị đi kèm..." />
+                <textarea className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-black" rows={2} value={roomFormData.description} onChange={(e) => setRoomFormData({ ...roomFormData, description: e.target.value })} placeholder="Vị trí, trang thiết bị đi kèm..." />
               </div>
               <div className="flex gap-2 pt-2">
                 <Dialog.Close className="flex-1 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">Hủy</Dialog.Close>
@@ -511,13 +626,13 @@ export default function RoomManagement() {
             <form className="space-y-4" onSubmit={handleSaveEdit}>
               <div>
                 <label className="block text-sm font-medium mb-1">Số phòng</label>
-                <input type="text" value={roomFormData.roomNumber} onChange={(e) => setRoomFormData({ ...roomFormData, roomNumber: e.target.value })} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" required />
+                <input type="text" value={roomFormData.roomNumber} onChange={(e) => setRoomFormData({ ...roomFormData, roomNumber: e.target.value })} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-black" required />
               </div>
               <div className="grid grid-cols-2 gap-2">
                 <div>
                   <label className="block text-sm font-medium mb-1">Chọn Tầng</label>
                   <select
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-1 focus:ring-black"
                     value={roomFormData.floorId}
                     onChange={(e) => setRoomFormData({ ...roomFormData, floorId: e.target.value })}
                     required
@@ -530,26 +645,26 @@ export default function RoomManagement() {
                 </div>
                 <div>
                   <label className="block text-sm font-medium mb-1">Số người tối đa</label>
-                  <input type="number" value={roomFormData.maxOccupants} onChange={(e) => setRoomFormData({ ...roomFormData, maxOccupants: Number(e.target.value) })} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" required />
+                  <input type="number" value={roomFormData.maxOccupants} onChange={(e) => setRoomFormData({ ...roomFormData, maxOccupants: Number(e.target.value) })} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-black" required />
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-2">
                 <div>
                   <label className="block text-sm font-medium mb-1">Diện tích (m²)</label>
-                  <input type="number" step="any" value={roomFormData.area} onChange={(e) => setRoomFormData({ ...roomFormData, area: Number(e.target.value) })} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" required />
+                  <input type="number" step="any" value={roomFormData.area} onChange={(e) => setRoomFormData({ ...roomFormData, area: Number(e.target.value) })} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-black" required />
                 </div>
                 <div>
                   <label className="block text-sm font-medium mb-1">Giá thuê (VNĐ)</label>
-                  <input type="number" value={roomFormData.price} onChange={(e) => setRoomFormData({ ...roomFormData, price: Number(e.target.value) })} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" required />
+                  <input type="number" value={roomFormData.price} onChange={(e) => setRoomFormData({ ...roomFormData, price: Number(e.target.value) })} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-black" required />
                 </div>
               </div>
               <div>
                 <label className="block text-sm font-medium mb-1">Tiền đặt cọc</label>
-                <input type="number" value={roomFormData.roomDeposit} onChange={(e) => setRoomFormData({ ...roomFormData, roomDeposit: Number(e.target.value) })} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" required />
+                <input type="number" value={roomFormData.roomDeposit} onChange={(e) => setRoomFormData({ ...roomFormData, roomDeposit: Number(e.target.value) })} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-black" required />
               </div>
               <div>
                 <label className="block text-sm font-medium mb-1">Mô tả</label>
-                <textarea value={roomFormData.description} onChange={(e) => setRoomFormData({ ...roomFormData, description: e.target.value })} className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" rows={2} />
+                <textarea value={roomFormData.description} onChange={(e) => setRoomFormData({ ...roomFormData, description: e.target.value })} className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-black" rows={2} />
               </div>
               <div className="flex gap-2 pt-2">
                 <Dialog.Close className="flex-1 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">Hủy</Dialog.Close>
@@ -574,12 +689,12 @@ export default function RoomManagement() {
             <form className="space-y-4" onSubmit={handleSaveRent}>
               <div>
                 <label className="block text-sm font-medium mb-1">Mã số hợp đồng</label>
-                <input type="text" value={contractFormData.contractNumber} onChange={(e) => setContractFormData({ ...contractFormData, contractNumber: e.target.value })} className="w-full px-3 py-2 border border-gray-300 bg-gray-50 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" required />
+                <input type="text" value={contractFormData.contractNumber} onChange={(e) => setContractFormData({ ...contractFormData, contractNumber: e.target.value })} className="w-full px-3 py-2 border border-gray-300 bg-gray-50 rounded-lg focus:outline-none focus:ring-1 focus:ring-black" required />
               </div>
               <div>
                 <label className="block text-sm font-medium mb-1">Chọn Khách hàng thuê</label>
                 <select
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-1 focus:ring-black"
                   value={contractFormData.tenantName}
                   onChange={(e) => setContractFormData({ ...contractFormData, tenantName: e.target.value })}
                   required
@@ -600,16 +715,16 @@ export default function RoomManagement() {
               <div className="grid grid-cols-2 gap-2">
                 <div>
                   <label className="block text-sm font-medium mb-1">Ngày bắt đầu</label>
-                  <input type="date" value={contractFormData.startDate} onChange={(e) => setContractFormData({ ...contractFormData, startDate: e.target.value })} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" required />
+                  <input type="date" value={contractFormData.startDate} onChange={(e) => setContractFormData({ ...contractFormData, startDate: e.target.value })} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-black" required />
                 </div>
                 <div>
                   <label className="block text-sm font-medium mb-1">Ngày kết thúc</label>
-                  <input type="date" value={contractFormData.endDate} onChange={(e) => setContractFormData({ ...contractFormData, endDate: e.target.value })} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" required />
+                  <input type="date" value={contractFormData.endDate} onChange={(e) => setContractFormData({ ...contractFormData, endDate: e.target.value })} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-black" required />
                 </div>
               </div>
               <div>
                 <label className="block text-sm font-medium mb-1">Ngày thanh toán định kỳ (hàng tháng)</label>
-                <input type="number" min={1} max={31} value={contractFormData.paymentDate} onChange={(e) => setContractFormData({ ...contractFormData, paymentDate: Number(e.target.value) })} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" required />
+                <input type="number" min={1} max={31} value={contractFormData.paymentDate} onChange={(e) => setContractFormData({ ...contractFormData, paymentDate: Number(e.target.value) })} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-black" required />
               </div>
               <div>
                 <label className="block text-sm font-medium mb-1">Tiền thanh toán định kỳ (hàng tháng)</label>
@@ -618,7 +733,7 @@ export default function RoomManagement() {
                   min={1000}
                   value={contractFormData.price}
                   onChange={(e) => setContractFormData({ ...contractFormData, price: Number(e.target.value) })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-black"
                   required
                 />
               </div>
