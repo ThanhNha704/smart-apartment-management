@@ -9,7 +9,7 @@ import {
   Gauge,
   // Settings,
   Menu,
-  Home,
+  // Home,
   Layers,
   FileSignature,
   Wrench,
@@ -54,7 +54,14 @@ export default function Sidebar({ open, onToggle }: SidebarProps) {
         {open ? (
           <>
             <div className="flex items-center gap-2">
-              <Home className="w-6 h-6 text-blue-600" />
+              {/* <Home className="w-6 h-6 text-blue-600" /> */}
+              <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl overflow-hidden p-1">
+                <img
+                  src="/logo.svg"
+                  alt="Smart Boarding House Logo"
+                  className="w-full h-full object-contain"
+                />
+              </div>
               <span className="font-semibold text-lg">Quản lý trọ</span>
             </div>
             <button onClick={onToggle} className="p-1 hover:bg-gray-100 rounded">
@@ -91,11 +98,10 @@ export default function Sidebar({ open, onToggle }: SidebarProps) {
             <Link
               key={item.path}
               to={item.path}
-              className={`flex items-center gap-3 px-3 py-3 rounded-lg mb-1 transition-colors ${
-                isActive
+              className={`flex items-center gap-3 px-3 py-3 rounded-lg mb-1 transition-colors ${isActive
                   ? 'bg-blue-50 text-blue-600'
                   : 'text-gray-700 hover:bg-gray-100'
-              } ${!open ? 'justify-center' : ''}`}
+                } ${!open ? 'justify-center' : ''}`}
             >
               <Icon className="w-5 h-5 flex-shrink-0" />
               {open && <span>{item.label}</span>}

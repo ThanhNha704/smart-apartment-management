@@ -267,7 +267,7 @@ export default function InvoiceManagement() {
             title="Thay đổi thứ tự sắp xếp theo kỳ hạn"
           >
             <ArrowUpDown className="w-4 h-4 text-gray-500" />
-            <span>Kỳ hạn: {sortOrder === 'asc' ? 'Gần nhất' : 'Xa nhất'}</span>
+            <span>Kỳ hạn: {sortOrder === 'asc' ? 'Cũ nhất' : 'Mới nhất'}</span>
           </button>
 
           <select
