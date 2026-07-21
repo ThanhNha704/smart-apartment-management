@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router';
-import { Home, Lock, Mail, LogIn, Eye, EyeOff } from 'lucide-react';
+import { Lock, Mail, LogIn, Eye, EyeOff } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { toast } from 'sonner';
 
