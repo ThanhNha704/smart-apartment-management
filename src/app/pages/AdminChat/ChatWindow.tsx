@@ -276,7 +276,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ tenant, tenantId, onMessageSent
   // TRẠNG THÁI TRỐNG KHI CHƯA CHỌN CĂN HỘ/NGƯỜI THUÊ KHÁCH HÀNG
   if (!tenantId) {
     return (
-      <div className="flex-1 flex flex-col items-center justify-center bg-gray-50 text-gray-400 p-6 h-full max-h-screen">
+      <div className="flex-1 flex flex-col items-center justify-center bg-gray-50 text-gray-400 p-6 h-full">
         <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 flex flex-col items-center max-w-sm text-center">
           <div className="bg-blue-50 text-blue-500 rounded-2xl flex items-center justify-center mb-4 p-4">
             <MessageSquare className="w-8 h-8" />
@@ -291,7 +291,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ tenant, tenantId, onMessageSent
   }
 
   return (
-    <div className="flex-1 flex flex-col h-full h-screen bg-white overflow-hidden border border-gray-100 rounded-r-xl">
+    <div className="flex-1 flex flex-col h-full bg-white overflow-hidden border border-gray-100 rounded-r-xl">
       
       {/* HEADER CỬA SỔ CHAT */}
       <div className="h-16 bg-white border-b border-gray-100 px-6 flex items-center justify-between flex-shrink-0 z-10">

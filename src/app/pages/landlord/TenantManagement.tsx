@@ -100,14 +100,29 @@ export default function TenantManagement() {
     }
   };
 
+  // Hàm dùng chung: trả về "YYYY-MM-DD" an toàn cho <input type="date">
+  // Không dùng new Date().getDate()/getMonth() trực tiếp trên dateStr gốc
+  // vì sẽ bị lệch ngày theo timezone trình duyệt của client
+  const getDateInputValue = (dateStr: string | null | undefined) => {
+    if (!dateStr) return '';
+
+    const datePart = dateStr.trim().split('T')[0].split(' ')[0];
+    const match = datePart.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    if (match) return datePart; // đã đúng định dạng YYYY-MM-DD, dùng luôn
+
+    // Trường hợp chuỗi không đúng định dạng ISO chuẩn (hiếm gặp) -> parse dự phòng bằng UTC
+    const date = new Date(dateStr);
+    if (isNaN(date.getTime())) return '';
+
+    const year = date.getUTCFullYear();
+    const month = String(date.getUTCMonth() + 1).padStart(2, '0');
+    const day = String(date.getUTCDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+
   // Mở modal chỉnh sửa
   const openEditModal = (tenant: UserTenant) => {
     setSelectedTenantId(tenant.id);
-
-    let formattedDate = '';
-    if (tenant.dateOfBirth) {
-      formattedDate = tenant.dateOfBirth.split('T')[0];
-    }
 
     setFormData({
       name: tenant.name,
@@ -116,7 +131,7 @@ export default function TenantManagement() {
       phoneNumber: tenant.phoneNumber,
       idCard: tenant.idCard || '',
       address: tenant.address,
-      dateOfBirth: formattedDate,
+      dateOfBirth: getDateInputValue(tenant.dateOfBirth),
     });
     setIsEditOpen(true);
   };
@@ -183,25 +198,25 @@ export default function TenantManagement() {
   const formatDateDisplay = (dateStr: string) => {
     if (!dateStr) return 'Chưa cập nhật';
 
-    try {
-      // Tách chuỗi bằng khoảng trắng để lấy phần đầu tiên
-      const firstPart = dateStr.trim().split(' ')[0]; // Kết quả sẽ là '16/07/2026' hoặc '2000-03-19'
+    // Lấy phần "YYYY-MM-DD" trực tiếp từ chuỗi ISO/server,
+    // KHÔNG dùng new Date().getDate() vì sẽ bị lệch ngày theo timezone trình duyệt
+    const datePart = dateStr.trim().split('T')[0].split(' ')[0];
+    const match = datePart.match(/^(\d{4})-(\d{2})-(\d{2})$/);
 
-      // Nếu chuỗi trả về chứa chữ 'T'
-      const onlyDate = firstPart.includes('T') ? firstPart.split('T')[0] : firstPart;
-
-      // Nếu không rơi vào các trường hợp trên
-      const date = new Date(dateStr);
-      if (isNaN(date.getTime())) return onlyDate;
-
-      const day = String(date.getDate()).padStart(2, '0');
-      const month = String(date.getMonth() + 1).padStart(2, '0');
-      const year = date.getFullYear();
-
+    if (match) {
+      const [, year, month, day] = match;
       return `${day}/${month}/${year}`;
-    } catch {
-      return dateStr;
     }
+
+    // Trường hợp chuỗi không đúng định dạng ISO chuẩn (hiếm gặp) -> parse dự phòng bằng UTC
+    const date = new Date(dateStr);
+    if (isNaN(date.getTime())) return datePart;
+
+    const day = String(date.getUTCDate()).padStart(2, '0');
+    const month = String(date.getUTCMonth() + 1).padStart(2, '0');
+    const year = date.getUTCFullYear();
+
+    return `${day}/${month}/${year}`;
   };
 
   const filteredTenants = tenants.filter(tenant =>

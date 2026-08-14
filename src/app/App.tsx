@@ -44,9 +44,9 @@ function LandlordLayout() {
   const [sidebarOpen, setSidebarOpen] = useState(true);
 
   return (
-    <div className="size-full flex bg-gray-50">
+    <div className="h-screen w-screen overflow-hidden flex bg-gray-50">
       <Sidebar open={sidebarOpen} onToggle={() => setSidebarOpen(!sidebarOpen)} />
-      <main className={`flex-1 overflow-auto transition-all duration-300 ${sidebarOpen ? 'ml-64' : 'ml-20'}`}>
+      <main className={`flex-1 h-full overflow-y-auto transition-all duration-300 ${sidebarOpen ? 'ml-64' : 'ml-20'}`}>
         <Routes>
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/floors" element={<FloorManagement />} />
