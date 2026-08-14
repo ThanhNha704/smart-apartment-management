@@ -165,11 +165,11 @@ const ConversationList: React.FC<ConversationListProps> = ({
                       >
                         {user.fullName || (user.roomNumber ? `Khách thuê P.${user.roomNumber}` : "Khách thuê")}
                       </span>
-                      {user.roomNumber && (
+                      {/* {user.roomNumber && (
                         <span className="text-[11px] font-medium bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded-md flex-shrink-0">
                           P.{user.roomNumber}
                         </span>
-                      )}
+                      )} */}
                     </div>
 
                     <span
