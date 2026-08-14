@@ -1,17 +1,10 @@
 // src/pages/AdminChat/ConversationList.tsx
-import React, { useState } from "react";
-import { User, Image as ImageIcon, Search, X } from "lucide-react";
+import React, { useState, useMemo } from "react";
+import { User, Image as ImageIcon, Search, X, Phone } from "lucide-react";
 
-// INTERFACES (Giữ nguyên không đổi)
-export interface TenantInfo {
-  id?: string;
-  fullName?: string;
-  avatar?: string;
-  roomNumber?: string;
-}
-
+// Interface khớp chính xác với kết quả trả về từ API backend
 export interface LastMessageInfo {
-  id?: string;
+  _id?: string;
   senderId?: string;
   senderRole?: "Admin" | "Tenant";
   content?: string;
@@ -19,15 +12,21 @@ export interface LastMessageInfo {
   createdAt?: string;
 }
 
-export interface ConversationItem {
-  conversationId: string;
-  tenant?: TenantInfo;
-  lastMessage?: LastMessageInfo;
-  unreadCount: number;
+export interface UserChatItem {
+  _id: string; // ID của Tenant
+  fullName?: string;
+  phone?: string;
+  avatar?: string;
+  email?: string;
+  roomNumber?: string;
+  isActive?: boolean;
+  hasConversation?: boolean;
+  lastMessage?: LastMessageInfo | null;
+  unreadCount?: number;
 }
 
 interface ConversationListProps {
-  conversations: ConversationItem[];
+  conversations: UserChatItem[];
   selectedTenantId: string | null;
   onlineUserIds: string[];
   onSelect: (tenantId: string) => void;
@@ -44,47 +43,55 @@ const formatTime = (dateStr?: string): string => {
 };
 
 const ConversationList: React.FC<ConversationListProps> = ({
-  conversations,
+  conversations = [],
   selectedTenantId,
-  onlineUserIds,
+  onlineUserIds = [],
   onSelect,
 }) => {
   const [searchTerm, setSearchTerm] = useState<string>("");
 
-  // Loại bỏ các ID trùng lặp để đảm bảo danh sách sạch
-  const uniqueConversations = (conversations || []).filter(
-    (conv, index, self) =>
-      self.findIndex((c) => c.conversationId === conv.conversationId) === index
-  );
+  // Loại bỏ các ID trùng lặp nếu có
+  const uniqueList = useMemo(() => {
+    return (conversations || []).filter(
+      (user, index, self) => self.findIndex((u) => u._id === user._id) === index
+    );
+  }, [conversations]);
 
-  // Lọc theo từ khóa tìm kiếm (hiện toàn bộ danh sách khi ô tìm kiếm trống)
-  const filteredConversations = uniqueConversations.filter((conv) => {
+  // Lọc theo Tên, Số phòng hoặc Số điện thoại
+  const filteredList = useMemo(() => {
     const search = searchTerm.trim().toLowerCase();
-    if (!search) return true;
+    if (!search) return uniqueList;
 
-    const fullName = conv.tenant?.fullName?.toLowerCase() || "";
-    const roomNumber = conv.tenant?.roomNumber?.toLowerCase() || "";
-    return fullName.includes(search) || roomNumber.includes(search);
-  });
+    return uniqueList.filter((user) => {
+      const fullName = user.fullName?.toLowerCase() || "";
+      const roomNumber = user.roomNumber?.toLowerCase() || "";
+      const phone = user.phone?.toLowerCase() || "";
+      return (
+        fullName.includes(search) ||
+        roomNumber.includes(search) ||
+        phone.includes(search)
+      );
+    });
+  }, [uniqueList, searchTerm]);
 
   return (
     <div className="flex flex-col h-full bg-white border-r border-gray-200 w-full max-w-sm">
-      {/* Header tiêu đề */}
+      {/* Header & Ô tìm kiếm */}
       <div className="p-4 border-b border-gray-100 flex flex-col gap-3">
         <div className="flex items-center justify-between">
           <h1 className="text-2xl font-semibold text-gray-800 tracking-tight">Tin nhắn</h1>
           <span className="text-xs bg-blue-50 text-blue-600 font-medium px-2.5 py-1 rounded-full">
-            {uniqueConversations.length} cuộc hội thoại
+            {uniqueList.length} khách thuê
           </span>
         </div>
 
-        {/* THANH TÌM KIẾM */}
+        {/* Thanh tìm kiếm */}
         <div className="relative flex items-center">
           <Search className="w-4 h-4 text-gray-400 absolute left-3 pointer-events-none" />
           <input
             type="text"
             className="w-full h-9 pl-9 pr-8 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-blue-400 focus:bg-white transition-all placeholder:text-gray-400"
-            placeholder="Tìm theo tên hoặc số phòng..."
+            placeholder="Tìm theo tên, SĐT hoặc số phòng..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
           />
@@ -99,41 +106,40 @@ const ConversationList: React.FC<ConversationListProps> = ({
         </div>
       </div>
 
-      {/* Danh sách cuộc trò chuyện */}
+      {/* Danh sách người dùng / hội thoại */}
       <div className="flex-1 overflow-y-auto p-2 space-y-1 custom-scrollbar">
-        {filteredConversations.length === 0 ? (
+        {filteredList.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-48 text-gray-400 space-y-2">
             <User className="w-8 h-8 opacity-50" />
             <span className="text-sm font-medium">
-              {searchTerm ? "Không tìm thấy kết quả phù hợp" : "Chưa có cuộc trò chuyện nào"}
+              {searchTerm ? "Không tìm thấy kết quả phù hợp" : "Chưa có khách thuê nào"}
             </span>
           </div>
         ) : (
-          filteredConversations.map((conv) => {
-            const tenant = conv.tenant || {};
-            const isSelected = selectedTenantId === conv.conversationId;
-            const isOnline = onlineUserIds.includes(conv.conversationId);
-            
-            // Ẩn badge và trạng thái unread ngay khi cuộc hội thoại được chọn (click vào)
-            const hasUnread = conv.unreadCount > 0 && !isSelected;
+          filteredList.map((user) => {
+            const isSelected = selectedTenantId === user._id;
+            const isOnline = onlineUserIds.includes(user._id);
+            const unreadCount = user.unreadCount || 0;
+            const hasUnread = unreadCount > 0 && !isSelected;
 
             return (
               <div
-                key={conv.conversationId}
+                key={user._id}
                 className={`flex items-center gap-3 p-3 rounded-xl cursor-pointer transition-all duration-200 select-none
-                  ${isSelected
-                    ? "bg-blue-100 text-blue-950 shadow-sm"
-                    : "hover:bg-gray-200 active:bg-gray-150 text-gray-750"
+                  ${
+                    isSelected
+                      ? "bg-blue-100 text-blue-950 shadow-sm"
+                      : "hover:bg-gray-100 active:bg-gray-200 text-gray-700"
                   }`}
-                onClick={() => onSelect(conv.conversationId)}
+                onClick={() => onSelect(user._id)}
               >
-                {/* Vùng ảnh đại diện (Avatar) */}
+                {/* Avatar + Trạng thái Online */}
                 <div className="relative flex-shrink-0">
-                  {tenant.avatar ? (
+                  {user.avatar ? (
                     <img
                       className="w-12 h-12 rounded-full object-cover border border-gray-100 shadow-sm"
-                      src={tenant.avatar}
-                      alt={tenant.fullName || "Tenant"}
+                      src={user.avatar}
+                      alt={user.fullName || "Tenant"}
                     />
                   ) : (
                     <div className="w-12 h-12 flex items-center justify-center bg-gray-100 text-gray-400 rounded-full border border-gray-200">
@@ -141,7 +147,6 @@ const ConversationList: React.FC<ConversationListProps> = ({
                     </div>
                   )}
 
-                  {/* Chấm trạng thái Online */}
                   {isOnline && (
                     <span className="absolute bottom-0 right-0 flex h-3.5 w-3.5 rounded-full bg-green-500 border-2 border-white">
                       <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
@@ -149,42 +154,69 @@ const ConversationList: React.FC<ConversationListProps> = ({
                   )}
                 </div>
 
-                {/* Nội dung tin nhắn tóm tắt */}
+                {/* Thông tin & Tin nhắn tóm tắt */}
                 <div className="flex-1 min-w-0">
                   <div className="flex items-baseline justify-between mb-0.5">
                     <div className="flex items-center gap-1.5 min-w-0">
-                      <span className={`text-[15px] truncate ${hasUnread ? "font-semibold text-gray-900" : "font-medium text-gray-800"}`}>
-                        {tenant.fullName || (tenant.roomNumber ? `Khách thuê P.${tenant.roomNumber}` : "Khách thuê")}
+                      <span
+                        className={`text-[15px] truncate ${
+                          hasUnread ? "font-semibold text-gray-900" : "font-medium text-gray-800"
+                        }`}
+                      >
+                        {user.fullName || (user.roomNumber ? `Khách thuê P.${user.roomNumber}` : "Khách thuê")}
                       </span>
-                      {tenant.roomNumber && (
+                      {user.roomNumber && (
                         <span className="text-[11px] font-medium bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded-md flex-shrink-0">
-                          P.{tenant.roomNumber}
+                          P.{user.roomNumber}
                         </span>
                       )}
                     </div>
-                    <span className={`text-xs flex-shrink-0 ml-2 ${hasUnread ? "font-semibold text-blue-600" : "text-gray-400"}`}>
-                      {formatTime(conv.lastMessage?.createdAt)}
+
+                    <span
+                      className={`text-xs flex-shrink-0 ml-2 ${
+                        hasUnread ? "font-semibold text-blue-600" : "text-gray-400"
+                      }`}
+                    >
+                      {formatTime(user.lastMessage?.createdAt)}
                     </span>
                   </div>
 
                   <div className="flex items-center justify-between">
-                    <p className={`text-sm truncate ${hasUnread ? "font-semibold text-gray-900" : "text-gray-500"}`}>
-                      {conv.lastMessage?.senderRole === "Admin" && (
-                        <span className="text-gray-400 font-normal">Bạn: </span>
-                      )}
-                      {conv.lastMessage?.type === "Image" ? (
-                        <span className="inline-flex items-center gap-1 text-blue-500 font-medium text-xs">
-                          <ImageIcon className="w-3.5 h-3.5" /> [Hình ảnh]
-                        </span>
+                    <p
+                      className={`text-sm truncate ${
+                        hasUnread ? "font-semibold text-gray-900" : "text-gray-500"
+                      }`}
+                    >
+                      {user.lastMessage ? (
+                        <>
+                          {user.lastMessage.senderRole === "Admin" && (
+                            <span className="text-gray-400 font-normal">Bạn: </span>
+                          )}
+                          {user.lastMessage.type === "Image" ? (
+                            <span className="inline-flex items-center gap-1 text-blue-500 font-medium text-xs">
+                              <ImageIcon className="w-3.5 h-3.5" /> [Hình ảnh]
+                            </span>
+                          ) : (
+                            user.lastMessage.content || <span className="italic text-gray-300 text-xs">Tin nhắn trống</span>
+                          )}
+                        </>
                       ) : (
-                        conv.lastMessage?.content || <span className="italic text-gray-300 text-xs">Chưa có tin nhắn</span>
+                        <span className="italic text-gray-400 text-xs flex items-center gap-1">
+                          {user.phone ? (
+                            <>
+                              <Phone className="w-3 h-3" /> {user.phone}
+                            </>
+                          ) : (
+                            "Bắt đầu trò chuyện"
+                          )}
+                        </span>
                       )}
                     </p>
 
-                    {/* Badge số tin nhắn chưa đọc - Chỉ hiển thị khi có unread và CHƯA được chọn */}
+                    {/* Badge số tin nhắn chưa đọc */}
                     {hasUnread && (
-                      <span className="flex items-center justify-center min-w-5 h-5 px-1.5 ml-2 text-[11px] font-bold text-white bg-blue-600 rounded-full animate-fade-in shadow-sm">
-                        {conv.unreadCount}
+                      <span className="flex items-center justify-center min-w-5 h-5 px-1.5 ml-2 text-[11px] font-bold text-white bg-blue-600 rounded-full shadow-sm">
+                        {unreadCount}
                       </span>
                     )}
                   </div>

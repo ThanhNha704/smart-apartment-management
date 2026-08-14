@@ -507,10 +507,17 @@ export default function RoomManagement() {
                         </button>
                       </>
                     ) : (
-                      // Khi phòng đã được thuê: Không hiển thị nút bấm nào cả, chỉ hiện trạng thái text mờ
-                      <div className="flex-1 text-center py-2 text-sm font-medium text-gray-400 bg-gray-50 rounded-lg select-none">
-                        Phòng đang được thuê
-                      </div>
+                      <>
+                        <div className="flex-[2] text-center py-2 text-sm font-medium text-gray-400 bg-gray-50 rounded-lg select-none flex items-center justify-center">
+                          {room.status === RoomStatus.Occupied ? 'Phòng đang được thuê' : 'Bảo trì'}
+                        </div>
+                        <button
+                          onClick={() => openEditModal(room)}
+                          className="flex-1 px-3 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 flex items-center justify-center gap-2 text-sm font-medium"
+                        >
+                          <Edit className="w-4 h-4" /> Sửa
+                        </button>
+                      </>
                     )}
                   </div>
                 </div>

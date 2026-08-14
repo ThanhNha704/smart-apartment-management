@@ -324,7 +324,7 @@ export default function InvoiceManagement() {
                         <td className="px-6 py-4">
                           <div className="flex items-center justify-center gap-1">
                             <button onClick={() => setSelectedInvoice(invoice)} className="p-2 hover:bg-gray-100 text-gray-600 rounded-md" title="Xem chi tiết"><Eye className="w-4 h-4" /></button>
-                            <button onClick={() => { setSelectedInvoice(invoice); setShowQRDialog(true); }} className="p-2 hover:bg-gray-100 text-gray-600 rounded-md" title="Mã QR Pay"><QrCode className="w-4 h-4" /></button>
+                            {/* <button onClick={() => { setSelectedInvoice(invoice); setShowQRDialog(true); }} className="p-2 hover:bg-gray-100 text-gray-600 rounded-md" title="Mã QR Pay"><QrCode className="w-4 h-4" /></button> */}
                             <button onClick={() => { setInvoiceToDelete(invoice); setIsDeleteDialogOpen(true); }} className="p-2 hover:bg-gray-100 text-red-600 rounded-md" title="Xóa bỏ"><Trash2 className="w-4 h-4" /></button>
                           </div>
                         </td>
