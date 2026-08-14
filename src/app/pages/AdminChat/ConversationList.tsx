@@ -51,17 +51,19 @@ const ConversationList: React.FC<ConversationListProps> = ({
 }) => {
   const [searchTerm, setSearchTerm] = useState<string>("");
 
-  // SỬA TẠI ĐÂY: Loại bỏ các ID trùng lặp trước khi filter tìm kiếm
-  const uniqueConversations = conversations.filter(
+  // Loại bỏ các ID trùng lặp để đảm bảo danh sách sạch
+  const uniqueConversations = (conversations || []).filter(
     (conv, index, self) =>
       self.findIndex((c) => c.conversationId === conv.conversationId) === index
   );
 
-  // LỌC DANH SÁCH THEO TÊN HOẶC SỐ PHÒNG (Dựa trên mảng uniqueConversations đã sạch)
+  // Lọc theo từ khóa tìm kiếm (hiện toàn bộ danh sách khi ô tìm kiếm trống)
   const filteredConversations = uniqueConversations.filter((conv) => {
+    const search = searchTerm.trim().toLowerCase();
+    if (!search) return true;
+
     const fullName = conv.tenant?.fullName?.toLowerCase() || "";
     const roomNumber = conv.tenant?.roomNumber?.toLowerCase() || "";
-    const search = searchTerm.toLowerCase();
     return fullName.includes(search) || roomNumber.includes(search);
   });
 
@@ -70,7 +72,7 @@ const ConversationList: React.FC<ConversationListProps> = ({
       {/* Header tiêu đề */}
       <div className="p-4 border-b border-gray-100 flex flex-col gap-3">
         <div className="flex items-center justify-between">
-          <h1 className="text-xl font-bold text-gray-800 tracking-tight">Tin nhắn</h1>
+          <h1 className="text-2xl font-semibold text-gray-800 tracking-tight">Tin nhắn</h1>
           <span className="text-xs bg-blue-50 text-blue-600 font-medium px-2.5 py-1 rounded-full">
             {uniqueConversations.length} cuộc hội thoại
           </span>
@@ -111,15 +113,17 @@ const ConversationList: React.FC<ConversationListProps> = ({
             const tenant = conv.tenant || {};
             const isSelected = selectedTenantId === conv.conversationId;
             const isOnline = onlineUserIds.includes(conv.conversationId);
-            const hasUnread = conv.unreadCount > 0;
+            
+            // Ẩn badge và trạng thái unread ngay khi cuộc hội thoại được chọn (click vào)
+            const hasUnread = conv.unreadCount > 0 && !isSelected;
 
             return (
               <div
                 key={conv.conversationId}
                 className={`flex items-center gap-3 p-3 rounded-xl cursor-pointer transition-all duration-200 select-none
                   ${isSelected
-                    ? "bg-blue-50 text-blue-950 shadow-sm"
-                    : "hover:bg-gray-50 active:bg-gray-150 text-gray-750"
+                    ? "bg-blue-100 text-blue-950 shadow-sm"
+                    : "hover:bg-gray-200 active:bg-gray-150 text-gray-750"
                   }`}
                 onClick={() => onSelect(conv.conversationId)}
               >
@@ -150,7 +154,7 @@ const ConversationList: React.FC<ConversationListProps> = ({
                   <div className="flex items-baseline justify-between mb-0.5">
                     <div className="flex items-center gap-1.5 min-w-0">
                       <span className={`text-[15px] truncate ${hasUnread ? "font-semibold text-gray-900" : "font-medium text-gray-800"}`}>
-                        {tenant.fullName || "Người dùng đã xoá"}
+                        {tenant.fullName || (tenant.roomNumber ? `Khách thuê P.${tenant.roomNumber}` : "Khách thuê")}
                       </span>
                       {tenant.roomNumber && (
                         <span className="text-[11px] font-medium bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded-md flex-shrink-0">
@@ -177,7 +181,7 @@ const ConversationList: React.FC<ConversationListProps> = ({
                       )}
                     </p>
 
-                    {/* Badge số tin nhắn chưa đọc */}
+                    {/* Badge số tin nhắn chưa đọc - Chỉ hiển thị khi có unread và CHƯA được chọn */}
                     {hasUnread && (
                       <span className="flex items-center justify-center min-w-5 h-5 px-1.5 ml-2 text-[11px] font-bold text-white bg-blue-600 rounded-full animate-fade-in shadow-sm">
                         {conv.unreadCount}

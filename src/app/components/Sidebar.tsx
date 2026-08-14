@@ -25,6 +25,8 @@ interface SidebarProps {
 
 const menuItems = [
   { path: '/dashboard', icon: LayoutDashboard, label: 'Tổng quan' },
+  { path: '/notification', icon: Bell, label: 'Thông báo' },
+  { path: '/messages', icon: MessageCircleMore, label: 'Tin nhắn' },
   { path: '/floors', icon: Layers, label: 'Quản lý tầng' },
   { path: '/rooms', icon: Building2, label: 'Quản lý phòng' },
   { path: '/tenants', icon: Users, label: 'Người thuê' },
@@ -32,8 +34,6 @@ const menuItems = [
   { path: '/invoices', icon: FileText, label: 'Hóa đơn' },
   { path: '/meter-reading', icon: Gauge, label: 'Lịch sử công tơ' },
   { path: '/maintenance', icon: Wrench, label: 'Yêu cầu sửa chữa' },
-  { path: '/messages', icon: MessageCircleMore, label: 'Tin nhắn' },
-  { path: '/notification', icon: Bell, label: 'Thông báo' },
   // { path: '/settings', icon: SettingsIcon, label: 'Cài đặt' },
 ];
 
