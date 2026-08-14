@@ -17,6 +17,7 @@ interface MaintenanceItem {
   status: number;
   statusLabel: string;
   createdAt: string;
+  images?: string[];
 }
 
 interface ApiResponse {
@@ -421,6 +422,28 @@ export default function MaintenanceRequests() {
                   <div>
                     <p className="text-xs text-gray-500 mb-1">Nội dung mô tả sự cố từ khách thuê</p>
                     <p className="text-gray-700 bg-gray-50/50 p-3 rounded-lg border border-gray-200 leading-relaxed whitespace-pre-wrap">{selectedRequest.description}</p>
+                  </div>
+
+                  <div className="pt-2">
+                    <p className="text-xs text-gray-500 mb-2">Hình ảnh đính kèm</p>
+                    {selectedRequest.images && selectedRequest.images.length > 0 ? (
+                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                        {selectedRequest.images.map((imgUrl, idx) => (
+                          <div key={idx} className="relative aspect-video rounded-lg overflow-hidden border border-gray-200 bg-gray-50">
+                            <img
+                              src={imgUrl}
+                              alt={`Ảnh đính kèm ${idx + 1}`}
+                              className="w-full h-full object-cover cursor-zoom-in hover:scale-105 transition-transform duration-200"
+                              onClick={() => window.open(imgUrl, '_blank')}
+                            />
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-sm text-gray-400 italic bg-gray-50/50 p-3 rounded-lg border border-gray-200 border-dashed">
+                        Không có hình ảnh đính kèm cho yêu cầu này.
+                      </p>
+                    )}
                   </div>
 
                   <div className="flex gap-2 pt-4 border-t border-gray-100 mt-6">
