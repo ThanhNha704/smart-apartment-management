@@ -63,7 +63,7 @@ export default function NotificationManagement() {
   const fetchNotifications = async () => {
     try {
       setIsLoading(true);
-      let query = `/Notification?page=${page}&pageSize=${pageSize}`;
+      let query = `/Notification/all?page=${page}&pageSize=${pageSize}`;
       if (isReadFilter !== null) {
         query += `&isRead=${isReadFilter}`;
       }
@@ -74,6 +74,8 @@ export default function NotificationManagement() {
         let items: NotificationItem[] = [];
         if (Array.isArray(data)) {
           items = data;
+        } else if (data && Array.isArray(data.data)) {
+          items = data.data;
         } else if (data && Array.isArray(data.items)) {
           items = data.items;
         }
