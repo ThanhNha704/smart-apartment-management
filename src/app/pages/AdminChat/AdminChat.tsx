@@ -19,7 +19,13 @@ interface UserTenant {
 
 const AdminChat: React.FC = () => {
   const [conversations, setConversations] = useState<UserChatItem[]>([]);
-  const [selectedTenantId, setSelectedTenantId] = useState<string | null>(null);
+  const [selectedTenantId, setSelectedTenantId] = useState<string | null>(() => {
+    const saved = localStorage.getItem("active_chat_user_id");
+    if (saved) {
+      localStorage.removeItem("active_chat_user_id");
+    }
+    return saved || null;
+  });
   const [onlineUserIds, setOnlineUserIds] = useState<string[]>([]);
   const [loadingList, setLoadingList] = useState<boolean>(true);
 

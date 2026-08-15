@@ -117,6 +117,20 @@ export default function InvoiceManagement() {
     setCurrentPage(1);
   }, [searchTerm, filterStatus]);
 
+  // Tự động mở chi tiết hóa đơn nếu chuyển tiếp từ thông báo
+  useEffect(() => {
+    if (invoices.length > 0) {
+      const pendingDetailId = localStorage.getItem('detail_invoice_id');
+      if (pendingDetailId) {
+        const found = invoices.find(item => item.id === pendingDetailId);
+        if (found) {
+          setSelectedInvoice(found);
+        }
+        localStorage.removeItem('detail_invoice_id');
+      }
+    }
+  }, [invoices]);
+
   // Hàm POST: Tạo hóa đơn mới
   const handleCreateInvoice = async (e: React.FormEvent) => {
     e.preventDefault();

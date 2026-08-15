@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
-import { Calendar, Loader2, Info, Zap, Droplet, ChevronLeft, ChevronRight, ArrowUpDown } from 'lucide-react';
+import { Calendar, Loader2, Info, Zap, Droplet, ChevronLeft, ChevronRight, ArrowUpDown, X } from 'lucide-react';
+import * as Dialog from '@radix-ui/react-dialog';
 import { toast } from 'sonner';
 import { fetchApi } from '../../api/fetchApi';
 
@@ -28,11 +29,19 @@ export default function MeterReadingHistory() {
   const [readings, setReadings] = useState<MeterReadingItem[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [filterType, setFilterType] = useState<string>('all');
+  const [filterMonth, setFilterMonth] = useState<string>('all');
+  const [filterYear, setFilterYear] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [sortBy, setSortBy] = useState<SortKey>('date-desc'); // Mặc định: Mới nhất lên đầu
+  const [selectedReading, setSelectedReading] = useState<MeterReadingItem | null>(null);
   
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 6; 
+
+  const uniqueYears = useMemo(() => {
+    const years = readings.map(r => r.year);
+    return Array.from(new Set(years)).sort((a, b) => b - a);
+  }, [readings]); 
 
   // Hàm GET: Tải lịch sử ghi số từ hệ thống
   const fetchData = async () => {
@@ -58,19 +67,36 @@ export default function MeterReadingHistory() {
     fetchData();
   }, []);
 
+  // Tự động mở chi tiết nếu có ID từ trang thông báo chuyển tiếp sang
+  useEffect(() => {
+    if (readings.length > 0) {
+      const pendingDetailId = localStorage.getItem('detail_meterreading_id');
+      if (pendingDetailId) {
+        const found = readings.find(item => item.id === pendingDetailId);
+        if (found) {
+          setSelectedReading(found);
+        }
+        localStorage.removeItem('detail_meterreading_id');
+      }
+    }
+  }, [readings]);
+
   // Reset về trang 1 mỗi khi thay đổi bộ lọc, từ khóa hoặc cách sắp xếp
   useEffect(() => {
     setCurrentPage(1);
-  }, [filterType, searchQuery, sortBy]);
+  }, [filterType, filterMonth, filterYear, searchQuery, sortBy]);
 
   // XỬ LÝ LỌC VÀ SẮP XẾP DỮ LIỆU
   const processedReadings = useMemo(() => {
-    // 1. Lọc theo Dịch vụ & Từ khóa tìm kiếm
+    // 1. Lọc theo Dịch vụ, Tháng, Năm & Từ khóa tìm kiếm
     const filtered = readings.filter(reading => {
       const matchesType = filterType === 'all' || reading.type.toString() === filterType;
+      const matchesMonth = filterMonth === 'all' || reading.month.toString() === filterMonth;
+      const matchesYear = filterYear === 'all' || reading.year.toString() === filterYear;
       const query = searchQuery.toLowerCase().trim();
 
-      if (!query) return matchesType;
+      if (!matchesType || !matchesMonth || !matchesYear) return false;
+      if (!query) return true;
 
       const roomNumberStr = reading.roomNumber ? reading.roomNumber.toLowerCase() : '';
       const tenantNameStr = reading.tenantName ? reading.tenantName.toLowerCase() : '';
@@ -81,7 +107,7 @@ export default function MeterReadingHistory() {
         tenantNameStr.includes(query) ||
         typeLabelStr.includes(query);
 
-      return matchesType && matchesQuery;
+      return matchesQuery;
     });
 
     // 2. Sắp xếp dữ liệu theo lựa chọn
@@ -102,7 +128,7 @@ export default function MeterReadingHistory() {
       }
       return 0;
     });
-  }, [readings, filterType, searchQuery, sortBy]);
+  }, [readings, filterType, filterMonth, filterYear, searchQuery, sortBy]);
 
   // XỬ LÝ PHÂN TRANG
   const totalItems = processedReadings.length;
@@ -137,16 +163,46 @@ export default function MeterReadingHistory() {
         </div>
 
         {/* Bộ lọc Loại Dịch Vụ */}
-        <div className="w-full md:w-56">
+        <div className="w-full md:w-48">
           <label className="block text-xs font-medium text-gray-500 mb-1">Loại dịch vụ</label>
           <select
             value={filterType}
             onChange={(e) => setFilterType(e.target.value)}
             className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-1 focus:ring-black text-sm"
           >
-            <option value="all">Tất cả loại dịch vụ</option>
+            <option value="all">Tất cả dịch vụ</option>
             <option value="0">⚡ Điện</option>
             <option value="1">💧 Nước</option>
+          </select>
+        </div>
+
+        {/* Bộ lọc Tháng */}
+        <div className="w-full md:w-36">
+          <label className="block text-xs font-medium text-gray-500 mb-1">Tháng</label>
+          <select
+            value={filterMonth}
+            onChange={(e) => setFilterMonth(e.target.value)}
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-1 focus:ring-black text-sm"
+          >
+            <option value="all">Tất cả tháng</option>
+            {Array.from({ length: 12 }, (_, i) => i + 1).map((m) => (
+              <option key={m} value={m.toString()}>Tháng {m}</option>
+            ))}
+          </select>
+        </div>
+
+        {/* Bộ lọc Năm */}
+        <div className="w-full md:w-36">
+          <label className="block text-xs font-medium text-gray-500 mb-1">Năm</label>
+          <select
+            value={filterYear}
+            onChange={(e) => setFilterYear(e.target.value)}
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-1 focus:ring-black text-sm"
+          >
+            <option value="all">Tất cả năm</option>
+            {uniqueYears.map((y) => (
+              <option key={y} value={y.toString()}>Năm {y}</option>
+            ))}
           </select>
         </div>
 
@@ -182,12 +238,12 @@ export default function MeterReadingHistory() {
           </div>
         ) : (
           <>
-            {/* Grid hiển thị thẻ card */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
               {currentReadings.map((reading) => (
                 <div
                   key={reading.id}
-                  className="p-5 border border-gray-200 rounded-xl hover:shadow-md transition-all flex flex-col justify-between bg-white"
+                  onClick={() => setSelectedReading(reading)}
+                  className="p-5 border border-gray-200 rounded-xl hover:shadow-lg hover:border-blue-300 transition-all flex flex-col justify-between bg-white cursor-pointer"
                 >
                   <div>
                     <div className="flex items-start justify-between mb-3">
@@ -300,6 +356,80 @@ export default function MeterReadingHistory() {
           Số liệu tiêu thụ và thành tiền được hệ thống tự động đồng bộ dựa trên dữ liệu chốt số công tơ hàng tháng. Mọi thắc mắc hoặc sai sót về số liệu, vui lòng kiểm tra lại hóa đơn gốc hoặc liên hệ quản trị viên hệ thống để cập nhật lại.
         </p>
       </div>
+
+      {/* Modal Chi tiết ghi số công tơ */}
+      <Dialog.Root open={selectedReading !== null} onOpenChange={(open) => !open && setSelectedReading(null)}>
+        <Dialog.Portal>
+          <Dialog.Overlay className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 animate-fade-in" />
+          <Dialog.Content className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-white rounded-xl p-6 w-full max-w-lg max-h-[90vh] overflow-auto z-50 shadow-xl border border-gray-100 flex flex-col">
+            {selectedReading && (
+              <>
+                <div className="flex justify-between items-center border-b border-gray-100 pb-3 mb-4">
+                  <Dialog.Title className="text-lg font-bold text-gray-900 flex items-center gap-2">
+                    {selectedReading.type === 0 ? <Zap className="w-5 h-5 text-amber-500 fill-amber-500" /> : <Droplet className="w-5 h-5 text-blue-500 fill-blue-500" />}
+                    Số {selectedReading.type === 0 ? 'điện' : 'nước'} — Phòng {selectedReading.roomNumber}
+                  </Dialog.Title>
+                  <Dialog.Close className="p-1.5 hover:bg-gray-100 rounded-full transition-colors">
+                    <X className="w-5 h-5 text-gray-500" />
+                  </Dialog.Close>
+                </div>
+                
+                <div className="space-y-4 text-sm flex-1">
+                  <div className="grid grid-cols-2 gap-4 bg-gray-50 p-4 rounded-xl border border-gray-100">
+                    <div>
+                      <p className="text-xs text-gray-500 mb-0.5">Khách thuê phòng</p>
+                      <p className="font-semibold text-gray-900">{selectedReading.tenantName || 'Trống / Chưa có'}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-gray-500 mb-0.5">Kỳ hóa đơn</p>
+                      <p className="font-semibold text-gray-900">Tháng {selectedReading.month}/{selectedReading.year}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-gray-500 mb-0.5">Chỉ số cũ</p>
+                      <p className="font-medium text-gray-800">{selectedReading.previousIndex}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-gray-500 mb-0.5">Chỉ số mới</p>
+                      <p className="font-medium text-gray-800">{selectedReading.currentIndex}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-gray-500 mb-0.5">Lượng tiêu thụ</p>
+                      <p className="font-bold text-blue-600">{selectedReading.usageLabel || `${selectedReading.usage} ${selectedReading.type === 0 ? 'kWh' : 'm³'}`}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-gray-500 mb-0.5">Đơn giá</p>
+                      <p className="font-semibold text-gray-800">{selectedReading.unitPrice.toLocaleString('vi-VN')} đ</p>
+                    </div>
+                    <div className="col-span-2 border-t border-gray-200 pt-2 flex justify-between items-center">
+                      <p className="text-xs text-gray-500">Tổng cộng thành tiền</p>
+                      <p className="font-bold text-green-600 text-lg">{selectedReading.total.toLocaleString('vi-VN')} ₫</p>
+                    </div>
+                  </div>
+
+                  {/* Hình ảnh minh chứng chỉ số công tơ */}
+                  <div className="pt-2">
+                    <p className="text-xs text-gray-500 mb-2 font-semibold uppercase">Ảnh chụp công tơ thực tế</p>
+                    {selectedReading.photoUrl ? (
+                      <div className="relative aspect-video rounded-lg overflow-hidden border border-gray-200 bg-gray-100 flex items-center justify-center">
+                        <img
+                          src={selectedReading.photoUrl}
+                          alt="Ảnh chụp công tơ"
+                          className="w-full h-full object-contain cursor-zoom-in hover:scale-102 transition-transform duration-200"
+                          onClick={() => window.open(selectedReading.photoUrl, '_blank')}
+                        />
+                      </div>
+                    ) : (
+                      <p className="text-sm text-gray-400 italic bg-gray-50/50 p-4 rounded-lg border border-gray-200 border-dashed text-center">
+                        Không có ảnh chụp minh chứng cho bản ghi này.
+                      </p>
+                    )}
+                  </div>
+                </div>
+              </>
+            )}
+          </Dialog.Content>
+        </Dialog.Portal>
+      </Dialog.Root>
     </div>
   );
 }

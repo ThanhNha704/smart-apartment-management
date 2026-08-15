@@ -38,6 +38,7 @@ export default function MaintenanceRequests() {
   const [filterPriority, setFilterPriority] = useState<string>('all');
   const [sortBy, setSortBy] = useState<SortKey>('priority-desc'); // Mặc định: Ưu tiên cao nhất lên đầu
   const [selectedRequest, setSelectedRequest] = useState<MaintenanceItem | null>(null);
+  const [adminNote, setAdminNote] = useState('');
 
   // Phân trang
   const [currentPage, setCurrentPage] = useState(1);
@@ -64,6 +65,36 @@ export default function MaintenanceRequests() {
   useEffect(() => {
     fetchRequests();
   }, []);
+
+  // Tải ghi chú từ LocalStorage khi chọn sự cố khác nhau
+  useEffect(() => {
+    if (selectedRequest) {
+      const savedNote = localStorage.getItem(`note_maintenance_${selectedRequest.id}`);
+      setAdminNote(savedNote || '');
+    } else {
+      setAdminNote('');
+    }
+  }, [selectedRequest]);
+
+  // Tự động mở chi tiết nếu chuyển tiếp từ trang thông báo
+  useEffect(() => {
+    if (apiData && apiData.items) {
+      const pendingDetailId = localStorage.getItem('detail_maintenance_id');
+      if (pendingDetailId) {
+        const found = apiData.items.find(item => item.id === pendingDetailId);
+        if (found) {
+          setSelectedRequest(found);
+        }
+        localStorage.removeItem('detail_maintenance_id');
+      }
+    }
+  }, [apiData]);
+
+  const handleSaveNote = () => {
+    if (!selectedRequest) return;
+    localStorage.setItem(`note_maintenance_${selectedRequest.id}`, adminNote);
+    toast.success('Đã lưu ghi chú thành công!');
+  };
 
   // Reset về trang 1 khi thay đổi bất kỳ bộ lọc hoặc kiểu sắp xếp nào
   useEffect(() => {
@@ -284,6 +315,11 @@ export default function MaintenanceRequests() {
                     <h3 className="font-semibold text-gray-900">{request.requestNumber || `ID: ${request.id.slice(0, 8)}`}</h3>
                     {getPriorityBadge(request.priority, request.priorityLabel)}
                     {getStatusBadge(request.status, request.statusLabel)}
+                    {localStorage.getItem(`note_maintenance_${request.id}`) && (
+                      <span className="text-[10px] bg-indigo-50 text-indigo-600 px-2 py-0.5 rounded border border-indigo-200 font-semibold select-none">
+                        Có ghi chú
+                      </span>
+                    )}
                   </div>
                   <p className="text-gray-600 text-sm">Phòng: <strong>{request.roomNumber}</strong> — Người thuê: {request.tenantName}</p>
                 </div>
@@ -444,6 +480,26 @@ export default function MaintenanceRequests() {
                         Không có hình ảnh đính kèm cho yêu cầu này.
                       </p>
                     )}
+                  </div>
+
+                  {/* Ghi chú của Chủ nhà */}
+                  <div className="pt-3 border-t border-gray-100">
+                    <p className="text-xs text-gray-500 mb-1.5 font-semibold uppercase tracking-wider">Ghi chú của chủ nhà</p>
+                    <textarea
+                      value={adminNote}
+                      onChange={(e) => setAdminNote(e.target.value)}
+                      placeholder="Nhập ghi chú xử lý, chi phí hoặc thông tin cần lưu lại..."
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-black bg-white resize-none"
+                      rows={3}
+                    />
+                    <div className="flex justify-end mt-2">
+                      <button
+                        onClick={handleSaveNote}
+                        className="px-4 py-1.5 bg-blue-50 text-blue-600 hover:bg-blue-100 text-xs font-semibold rounded-lg transition-colors border border-blue-200"
+                      >
+                        Lưu ghi chú
+                      </button>
+                    </div>
                   </div>
 
                   <div className="flex gap-2 pt-4 border-t border-gray-100 mt-6">

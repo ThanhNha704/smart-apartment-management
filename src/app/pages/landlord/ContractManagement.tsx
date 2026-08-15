@@ -107,6 +107,20 @@ export default function ContractManagement() {
     setCurrentPage(1);
   }, [searchTerm, filterStatus, sortBy]);
 
+  // Tự động mở chi tiết hợp đồng nếu chuyển tiếp từ thông báo
+  useEffect(() => {
+    if (contracts.length > 0) {
+      const pendingDetailId = localStorage.getItem('detail_contract_id');
+      if (pendingDetailId) {
+        const found = contracts.find(item => item.id === pendingDetailId);
+        if (found) {
+          setSelectedContract(found);
+        }
+        localStorage.removeItem('detail_contract_id');
+      }
+    }
+  }, [contracts]);
+
   // Tự động map dữ liệu phòng sang Form khi tạo mới
   useEffect(() => {
     if (isCreateDialogOpen) {

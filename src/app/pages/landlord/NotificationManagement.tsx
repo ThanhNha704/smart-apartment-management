@@ -27,6 +27,7 @@ interface NotificationItem {
   refId: string | null;
   refModel: string | null;
   isRead: boolean;
+  isReadAdmin: boolean;
   createdAt: string;
   meta?: Record<string, string>;
 }
@@ -65,7 +66,7 @@ export default function NotificationManagement() {
       setIsLoading(true);
       let query = `/Notification/all?page=${page}&pageSize=${pageSize}`;
       if (isReadFilter !== null) {
-        query += `&isRead=${isReadFilter}`;
+        query += `&isReadAdmin=${isReadFilter}`;
       }
 
       const res = await fetchApi(query);
@@ -82,7 +83,7 @@ export default function NotificationManagement() {
         setNotifications(items);
 
         // Tính toán nhanh số liệu thống kê
-        const unreadCount = items.filter(n => !n.isRead).length;
+        const unreadCount = items.filter(n => !n.isReadAdmin).length;
         setStats({
           total: items.length,
           unread: unreadCount,
@@ -182,7 +183,7 @@ export default function NotificationManagement() {
 
       if (response.ok) {
         setNotifications((prev) =>
-          prev.map((notif) => (notif.id === id ? { ...notif, isRead: true } : notif))
+          prev.map((notif) => (notif.id === id ? { ...notif, isReadAdmin: true } : notif))
         );
         if (!silent) toast.success('Đã đánh dấu đã đọc!');
       }
@@ -193,50 +194,62 @@ export default function NotificationManagement() {
 
   // PUT: Đánh dấu đã đọc all
   const handleMarkAllAsRead = async () => {
-    try {
-      const response = await fetchApi('/Notification/mark-all-read', {
-        method: 'PUT',
-      });
+    const unreadList = notifications.filter(n => !n.isReadAdmin);
+    if (unreadList.length === 0) {
+      toast.info('Tất cả thông báo đã được đọc!');
+      return;
+    }
 
-      if (response.ok) {
-        setNotifications((prev) => prev.map((notif) => ({ ...notif, isRead: true })));
-        toast.success('Đã đọc toàn bộ thông báo!');
-      }
+    try {
+      // Đánh dấu đọc từng cái qua API đồng bộ với backend
+      await Promise.all(
+        unreadList.map(n =>
+          fetchApi(`/Notification/mark-read/${n.id}`, {
+            method: 'PUT',
+          })
+        )
+      );
+
+      setNotifications((prev) => prev.map((notif) => ({ ...notif, isReadAdmin: true })));
+      toast.success('Đã đọc toàn bộ thông báo!');
     } catch (error) {
       console.error(error);
+      toast.error('Lỗi khi đồng bộ đánh dấu đọc tất cả!');
     }
   };
 
   // Xử lý chuyển trang hướng động khi click vào card thông báo
   const handleNotificationClick = async (notif: NotificationItem) => {
     // Đọc ngầm nếu chưa đọc
-    if (!notif.isRead) {
+    if (!notif.isReadAdmin) {
       await handleMarkAsRead(notif.id, true);
     }
 
     const model = notif.refModel?.toLowerCase();
-    switch (model) {
-      case 'message':
-      case 'chat':
+    if (model) {
+      if (model === 'message') {
+        localStorage.setItem("active_chat_user_id", notif.tenantId || '');
         navigate('/messages');
-        // toast.info('Đang chuyển hướng tới tin nhắn...');
-        break;
-      case 'bill':
-        navigate('/invoices');
-        break;
-      case 'issue':
-      case 'maintenance':
-        navigate('/issues');
-        break;
-      case 'contract':
-        navigate('/contracts');
-        break;
-      case 'room':
-        navigate('/rooms');
-        break;
-      default:
+        return;
+      }
+
+      const routeMap: Record<string, string> = {
+        invoice: '/invoices',
+        contract: '/contracts',
+        maintenancerequest: '/maintenance',
+        meterreading: '/meter-reading'
+      };
+
+      if (routeMap[model]) {
+        if (notif.refId) {
+          localStorage.setItem(`detail_${model === 'maintenancerequest' ? 'maintenance' : model}_id`, notif.refId);
+        }
+        navigate(routeMap[model]);
+      } else {
         toast.info(`Thông báo hệ thống: ${notif.title}`);
-        break;
+      }
+    } else {
+      toast.info(`Thông báo hệ thống: ${notif.title}`);
     }
   };
 
@@ -336,14 +349,14 @@ export default function NotificationManagement() {
             <div
               key={notif.id}
               onClick={() => handleNotificationClick(notif)} // Click vào thẻ để kích hoạt chuyển hướng
-              className={`bg-white p-5 rounded-xl border transition-all hover:shadow-md cursor-pointer flex flex-col md:flex-row justify-between items-start md:items-center gap-4 ${!notif.isRead ? 'border-l-4 border-l-blue-500 border-gray-200' : 'border-gray-100'
+              className={`bg-white p-5 rounded-xl border transition-all hover:shadow-md cursor-pointer flex flex-col md:flex-row justify-between items-start md:items-center gap-4 ${!notif.isReadAdmin ? 'border-l-4 border-l-blue-500 border-gray-200' : 'border-gray-100'
                 }`}
             >
               {/* Thẻ bên trái chứa nội dung chính */}
               <div className="flex items-start gap-4 flex-1">
                 <div className={`p-2.5 rounded-lg ${notif.refModel?.toLowerCase() === 'message'
                     ? 'bg-purple-50 text-purple-600' // Đổi sang màu tím nếu là tin nhắn
-                    : !notif.isRead ? 'bg-blue-50 text-blue-600' : 'bg-gray-100 text-gray-400'
+                    : !notif.isReadAdmin ? 'bg-blue-50 text-blue-600' : 'bg-gray-100 text-gray-400'
                   }`}>
                   {notif.refModel?.toLowerCase() === 'message' ? (
                     <MessageSquare className="w-5 h-5" />
@@ -363,9 +376,9 @@ export default function NotificationManagement() {
                     </span>
 
                     {/* Trạng thái Đã đọc / Chưa đọc */}
-                    <span className={`text-[10px] px-2.5 py-0.5 rounded-full font-medium ${notif.isRead ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'
+                    <span className={`text-[10px] px-2.5 py-0.5 rounded-full font-medium ${notif.isReadAdmin ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'
                       }`}>
-                      {notif.isRead ? 'Đã đọc' : 'Chưa đọc'}
+                      {notif.isReadAdmin ? 'Đã đọc' : 'Chưa đọc'}
                     </span>
 
                     <span className="text-xs text-gray-400">
@@ -373,7 +386,7 @@ export default function NotificationManagement() {
                     </span>
                   </div>
 
-                  <h3 className={`text-base flex items-center gap-2 ${!notif.isRead ? 'font-bold text-gray-900' : 'font-semibold text-gray-700'}`}>
+                  <h3 className={`text-base flex items-center gap-2 ${!notif.isReadAdmin ? 'font-bold text-gray-900' : 'font-semibold text-gray-700'}`}>
                     {notif.title}
                     {notif.refModel?.toLowerCase() === 'message' && (
                       <span className="text-[10px] bg-purple-100 text-purple-700 font-bold px-1.5 py-0.5 rounded">Tin nhắn mới</span>
@@ -396,7 +409,7 @@ export default function NotificationManagement() {
                 className="flex items-center gap-2 w-full md:w-auto border-t md:border-t-0 pt-3 md:pt-0 justify-end"
                 onClick={(e) => e.stopPropagation()}
               >
-                {!notif.isRead && (
+                {!notif.isReadAdmin && (
                   <button
                     onClick={() => handleMarkAsRead(notif.id)}
                     className="flex-1 md:flex-none px-4 py-2 border border-blue-200 text-blue-600 hover:bg-blue-50 rounded-lg text-sm font-medium flex items-center justify-center gap-1.5 transition-colors"
