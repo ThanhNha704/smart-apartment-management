@@ -541,13 +541,13 @@ export default function RoomManagement() {
                         <div className="flex items-center justify-between text-sm">
                           <span className="text-gray-600">Giá thuê</span>
                           <span className="font-medium text-blue-600">
-                            {room.price.toLocaleString("vi-VN")} ₫
+                            {room.price.toLocaleString("vi-VN")} VND
                           </span>
                         </div>
                         <div className="flex items-center justify-between text-sm">
                           <span className="text-gray-600">Tiền đặt cọc</span>
                           <span className="font-medium">
-                            {room.roomDeposit.toLocaleString("vi-VN")} ₫
+                            {room.roomDeposit.toLocaleString("vi-VN")} VND
                           </span>
                         </div>
                       </div>
@@ -1166,11 +1166,11 @@ export default function RoomManagement() {
                 <div className="space-y-1 text-sm text-blue-800">
                   <p>
                     Tiền thuê phòng:{" "}
-                    {selectedRoom?.price.toLocaleString("vi-VN")} ₫/tháng
+                    {selectedRoom?.price.toLocaleString("vi-VN")} VND/tháng
                   </p>
                   <p>
                     Tiền cọc giữ chỗ:{" "}
-                    {selectedRoom?.roomDeposit.toLocaleString("vi-VN")} ₫
+                    {selectedRoom?.roomDeposit.toLocaleString("vi-VN")} VND
                   </p>
                   <p className="font-semibold pt-1 border-t border-blue-200">
                     Tổng thu lần đầu:{" "}
@@ -1178,7 +1178,7 @@ export default function RoomManagement() {
                       (
                         selectedRoom.price + selectedRoom.roomDeposit
                       ).toLocaleString("vi-VN")}{" "}
-                    ₫
+                    VND
                   </p>
                 </div>
               </div>
