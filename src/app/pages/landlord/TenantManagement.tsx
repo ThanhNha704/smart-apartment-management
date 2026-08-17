@@ -1,8 +1,22 @@
-import { useState, useEffect } from 'react';
-import { Search, Plus, Edit, Trash2, Phone, Mail, MapPin, Loader2, Eye, EyeOff, CreditCard, Calendar } from 'lucide-react';
-import * as Dialog from '@radix-ui/react-dialog';
-import { toast } from 'sonner';
-import { fetchApi } from '../../api/fetchApi';
+import { useState, useEffect } from "react";
+import {
+  Search,
+  Plus,
+  Edit,
+  Trash2,
+  Phone,
+  Mail,
+  MapPin,
+  Loader2,
+  Eye,
+  EyeOff,
+  CreditCard,
+  Calendar,
+  Upload,
+} from "lucide-react";
+import * as Dialog from "@radix-ui/react-dialog";
+import { toast } from "sonner";
+import { fetchApi } from "../../api/fetchApi";
 
 // Interface
 interface UserTenant {
@@ -17,23 +31,29 @@ interface UserTenant {
   roomNumber: string | null;
   isActive: boolean;
   role: string;
+  frontImageUrl?: string | null;
+  backImageUrl?: string | null;
+  frontImage?: string | null;
+  backImage?: string | null;
 }
 
-// Cấu trúc Form
+// Cấu trúc Form (thêm 2 field ảnh)
 const blankTenantFormData = {
-  name: '',
-  password: '',
-  email: '',
-  phoneNumber: '',
-  idCard: '',
-  address: '',
-  dateOfBirth: '',
+  name: "",
+  password: "",
+  email: "",
+  phoneNumber: "",
+  idCard: "",
+  address: "",
+  dateOfBirth: "",
+  frontImage: null as File | null,
+  backImage: null as File | null,
 };
 
 export default function TenantManagement() {
   const [tenants, setTenants] = useState<UserTenant[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
-  const [searchTerm, setSearchTerm] = useState('');
+  const [searchTerm, setSearchTerm] = useState("");
   const [showPassword, setShowPassword] = useState(false);
 
   // Trạng thái đóng/mở Dialogs
@@ -46,17 +66,27 @@ export default function TenantManagement() {
   const [formData, setFormData] = useState(blankTenantFormData);
   const [selectedTenantId, setSelectedTenantId] = useState<string | null>(null);
 
+  // States quản lý hiển thị chi tiết người thuê
+  const [isDetailOpen, setIsDetailOpen] = useState(false);
+  const [selectedTenantDetail, setSelectedTenantDetail] =
+    useState<UserTenant | null>(null);
+
+  const openDetailModal = (tenant: UserTenant) => {
+    setSelectedTenantDetail(tenant);
+    setIsDetailOpen(true);
+  };
+
   // Lấy danh sách người dùng
   const fetchTenants = async () => {
     try {
       setLoading(true);
-      const response = await fetchApi('/Users');
-      if (!response.ok) throw new Error('Không thể tải dữ liệu');
+      const response = await fetchApi("/Users");
+      if (!response.ok) throw new Error("Không thể tải dữ liệu");
       const data = await response.json();
       setTenants(data);
     } catch (error) {
       console.error("Lỗi khi fetch users:", error);
-      toast.error('Không thể tải danh sách khách thuê từ server!');
+      toast.error("Không thể tải danh sách khách thuê từ server!");
     } finally {
       setLoading(false);
     }
@@ -66,57 +96,87 @@ export default function TenantManagement() {
     fetchTenants();
   }, []);
 
+  // Helper: tạo FormData từ formData hiện tại
+  const buildFormData = () => {
+    const fd = new FormData();
+
+    fd.append("Name", formData.name);
+    if (formData.password) fd.append("Password", formData.password);
+    if (formData.email) fd.append("Email", formData.email);
+    fd.append("PhoneNumber", formData.phoneNumber);
+    fd.append("IDCard", formData.idCard);
+    if (formData.address) fd.append("Address", formData.address);
+    if (formData.dateOfBirth) {
+      fd.append("DateOfBirth", new Date(formData.dateOfBirth).toISOString());
+    }
+
+    // Ảnh CCCD (chỉ append khi có file)
+    if (formData.frontImage) {
+      fd.append("FrontImage", formData.frontImage);
+    }
+    if (formData.backImage) {
+      fd.append("BackImage", formData.backImage);
+    }
+
+    return fd;
+  };
+
   // Xử lý Thêm người thuê mới (POST /api/Users)
   const handleAddTenant = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formData.name || !formData.password || !formData.phoneNumber || !formData.idCard || !formData.dateOfBirth) {
-      toast.error('Vui lòng điền đầy đủ các thông tin bắt buộc (Tên, Mật khẩu, SĐT, CCCD, Ngày sinh)!');
+    if (
+      !formData.name ||
+      !formData.password ||
+      !formData.phoneNumber ||
+      !formData.idCard ||
+      !formData.dateOfBirth
+    ) {
+      toast.error(
+        "Vui lòng điền đầy đủ các thông tin bắt buộc (Tên, Mật khẩu, SĐT, CCCD, Ngày sinh)!",
+      );
       return;
     }
 
     try {
-      const payload = {
-        ...formData,
-        dateOfBirth: new Date(formData.dateOfBirth).toISOString()
-      };
+      const payload = buildFormData();
 
-      const response = await fetchApi('/Users', {
-        method: 'POST',
-        body: JSON.stringify(payload),
+      const response = await fetchApi("/Users", {
+        method: "POST",
+        body: payload,
       });
 
       if (response.ok) {
-        toast.success('Thêm mới khách thuê thành công!');
+        toast.success("Thêm mới khách thuê thành công!");
         setIsAddOpen(false);
         setFormData(blankTenantFormData);
         fetchTenants();
       } else {
         const errorData = await response.json().catch(() => null);
-        const errMsg = errorData?.join?.(', ') || errorData?.message || 'Lỗi khi tạo tài khoản!';
+        const errMsg =
+          errorData?.join?.(", ") ||
+          errorData?.message ||
+          "Lỗi khi tạo tài khoản!";
         toast.error(errMsg);
       }
     } catch (error) {
-      toast.error('Lỗi kết nối đến server!');
+      toast.error("Lỗi kết nối đến server!");
     }
   };
 
   // Hàm dùng chung: trả về "YYYY-MM-DD" an toàn cho <input type="date">
-  // Không dùng new Date().getDate()/getMonth() trực tiếp trên dateStr gốc
-  // vì sẽ bị lệch ngày theo timezone trình duyệt của client
   const getDateInputValue = (dateStr: string | null | undefined) => {
-    if (!dateStr) return '';
+    if (!dateStr) return "";
 
-    const datePart = dateStr.trim().split('T')[0].split(' ')[0];
+    const datePart = dateStr.trim().split("T")[0].split(" ")[0];
     const match = datePart.match(/^(\d{4})-(\d{2})-(\d{2})$/);
-    if (match) return datePart; // đã đúng định dạng YYYY-MM-DD, dùng luôn
+    if (match) return datePart;
 
-    // Trường hợp chuỗi không đúng định dạng ISO chuẩn (hiếm gặp) -> parse dự phòng bằng UTC
     const date = new Date(dateStr);
-    if (isNaN(date.getTime())) return '';
+    if (isNaN(date.getTime())) return "";
 
     const year = date.getUTCFullYear();
-    const month = String(date.getUTCMonth() + 1).padStart(2, '0');
-    const day = String(date.getUTCDate()).padStart(2, '0');
+    const month = String(date.getUTCMonth() + 1).padStart(2, "0");
+    const day = String(date.getUTCDate()).padStart(2, "0");
     return `${year}-${month}-${day}`;
   };
 
@@ -126,12 +186,14 @@ export default function TenantManagement() {
 
     setFormData({
       name: tenant.name,
-      password: '',
+      password: "",
       email: tenant.email,
       phoneNumber: tenant.phoneNumber,
-      idCard: tenant.idCard || '',
+      idCard: tenant.idCard || "",
       address: tenant.address,
       dateOfBirth: getDateInputValue(tenant.dateOfBirth),
+      frontImage: null,
+      backImage: null,
     });
     setIsEditOpen(true);
   };
@@ -142,29 +204,27 @@ export default function TenantManagement() {
     if (!selectedTenantId) return;
 
     try {
-      const payload = {
-        ...formData,
-        dateOfBirth: formData.dateOfBirth ? new Date(formData.dateOfBirth).toISOString() : ""
-      };
+      const payload = buildFormData();
 
       const response = await fetchApi(`/Users/${selectedTenantId}`, {
-        method: 'PUT',
-        body: JSON.stringify(payload),
+        method: "PUT",
+        body: payload,
       });
 
       if (response.ok) {
-        toast.success('Cập nhật thông tin thành công!');
+        toast.success("Cập nhật thông tin thành công!");
         setIsEditOpen(false);
         setSelectedTenantId(null);
         setFormData(blankTenantFormData);
         fetchTenants();
       } else {
         const errorData = await response.json().catch(() => null);
-        const errMsg = errorData?.join?.(', ') || errorData?.message || 'Cập nhật thất bại!';
+        const errMsg =
+          errorData?.join?.(", ") || errorData?.message || "Cập nhật thất bại!";
         toast.error(errMsg);
       }
     } catch (error) {
-      toast.error('Lỗi kết nối đến server!');
+      toast.error("Lỗi kết nối đến server!");
     }
   };
 
@@ -173,20 +233,22 @@ export default function TenantManagement() {
     if (!tenantToDelete) return;
     try {
       const response = await fetchApi(`/Users/${tenantToDelete.id}`, {
-        method: 'DELETE',
+        method: "DELETE",
       });
 
       if (response.ok) {
-        toast.success('Đã xóa tài khoản thành công!');
+        toast.success("Đã xóa tài khoản thành công!");
         setIsDeleteDialogOpen(false);
         setTenantToDelete(null);
         fetchTenants();
       } else {
-        throw new Error('Xóa thất bại');
+        throw new Error("Xóa thất bại");
       }
     } catch (error) {
       console.error(error);
-      toast.error('Không thể xóa người dùng này (Có thể liên quan đến ràng buộc hợp đồng).');
+      toast.error(
+        "Không thể xóa người dùng này (Có thể liên quan đến ràng buộc hợp đồng).",
+      );
     }
   };
 
@@ -196,11 +258,9 @@ export default function TenantManagement() {
   };
 
   const formatDateDisplay = (dateStr: string) => {
-    if (!dateStr) return 'Chưa cập nhật';
+    if (!dateStr) return "Chưa cập nhật";
 
-    // Lấy phần "YYYY-MM-DD" trực tiếp từ chuỗi ISO/server,
-    // KHÔNG dùng new Date().getDate() vì sẽ bị lệch ngày theo timezone trình duyệt
-    const datePart = dateStr.trim().split('T')[0].split(' ')[0];
+    const datePart = dateStr.trim().split("T")[0].split(" ")[0];
     const match = datePart.match(/^(\d{4})-(\d{2})-(\d{2})$/);
 
     if (match) {
@@ -208,29 +268,78 @@ export default function TenantManagement() {
       return `${day}/${month}/${year}`;
     }
 
-    // Trường hợp chuỗi không đúng định dạng ISO chuẩn (hiếm gặp) -> parse dự phòng bằng UTC
     const date = new Date(dateStr);
     if (isNaN(date.getTime())) return datePart;
 
-    const day = String(date.getUTCDate()).padStart(2, '0');
-    const month = String(date.getUTCMonth() + 1).padStart(2, '0');
+    const day = String(date.getUTCDate()).padStart(2, "0");
+    const month = String(date.getUTCMonth() + 1).padStart(2, "0");
     const year = date.getUTCFullYear();
 
     return `${day}/${month}/${year}`;
   };
 
-  const filteredTenants = tenants.filter(tenant =>
-    tenant.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    tenant.phoneNumber?.includes(searchTerm) ||
-    tenant.idCard?.includes(searchTerm) ||
-    tenant.email?.toLowerCase().includes(searchTerm.toLowerCase())
+  const filteredTenants = tenants.filter(
+    (tenant) =>
+      tenant.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      tenant.phoneNumber?.includes(searchTerm) ||
+      tenant.idCard?.includes(searchTerm) ||
+      tenant.email?.toLowerCase().includes(searchTerm.toLowerCase()),
+  );
+
+  // Helper lấy URL ảnh linh hoạt theo tên trường trả về từ Backend
+  const getFrontImageUrl = (tenant: UserTenant) =>
+    tenant.frontImageUrl || tenant.frontImage || null;
+
+  const getBackImageUrl = (tenant: UserTenant) =>
+    tenant.backImageUrl || tenant.backImage || null;
+
+  // Component nhỏ hiển thị input file ảnh CCCD
+  const ImageUploadField = ({
+    label,
+    value,
+    onChange,
+  }: {
+    label: string;
+    value: File | null;
+    onChange: (file: File | null) => void;
+  }) => (
+    <div>
+      <label className="block text-sm font-medium mb-1">{label}</label>
+      <div className="flex items-center gap-3">
+        <label className="flex-1 cursor-pointer">
+          <div className="flex items-center gap-2 px-3 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
+            <Upload className="w-4 h-4 text-gray-500" />
+            <span className="text-sm text-gray-600 truncate">
+              {value ? value.name : "Chọn ảnh..."}
+            </span>
+          </div>
+          <input
+            type="file"
+            accept="image/*"
+            className="hidden"
+            onChange={(e) => onChange(e.target.files?.[0] || null)}
+          />
+        </label>
+        {value && (
+          <button
+            type="button"
+            onClick={() => onChange(null)}
+            className="text-xs text-red-500 hover:underline"
+          >
+            Xóa
+          </button>
+        )}
+      </div>
+    </div>
   );
 
   return (
     <div className="p-6 max-w-7xl mx-auto">
       <div className="mb-6">
         <h1 className="text-2xl font-semibold mb-1">Quản lý người thuê</h1>
-        <p className="text-gray-600">Danh sách tài khoản khách thuê phòng trọ</p>
+        <p className="text-gray-600">
+          Danh sách tài khoản khách thuê phòng trọ
+        </p>
       </div>
 
       {/* Thanh công cụ Tìm kiếm & Thêm mới */}
@@ -263,23 +372,35 @@ export default function TenantManagement() {
       {loading ? (
         <div className="flex flex-col items-center justify-center py-20 gap-2">
           <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
-          <p className="text-sm text-gray-500">Đang đồng bộ dữ liệu hệ thống...</p>
+          <p className="text-sm text-gray-500">
+            Đang đồng bộ dữ liệu hệ thống...
+          </p>
         </div>
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
           {filteredTenants.map((tenant) => (
-            <div key={tenant.id} className="bg-white rounded-lg border border-gray-200 p-5 hover:shadow-lg transition-shadow">
+            <div
+              key={tenant.id}
+              onClick={() => openDetailModal(tenant)}
+              className="bg-white rounded-lg border border-gray-200 p-5 hover:shadow-lg transition-shadow cursor-pointer"
+            >
               <div className="flex items-start justify-between mb-4">
                 <div className="flex items-center gap-3">
                   {tenant.avatarUrl ? (
-                    <img src={tenant.avatarUrl} alt={tenant.name} className="w-12 h-12 rounded-full object-cover" />
+                    <img
+                      src={tenant.avatarUrl}
+                      alt={tenant.name}
+                      className="w-12 h-12 rounded-full object-cover"
+                    />
                   ) : (
                     <div className="w-12 h-12 bg-linear-to-br from-blue-500 to-indigo-600 rounded-full flex items-center justify-center text-white font-semibold">
-                      {tenant.name ? tenant.name.charAt(0).toUpperCase() : 'U'}
+                      {tenant.name ? tenant.name.charAt(0).toUpperCase() : "U"}
                     </div>
                   )}
                   <div>
-                    <h3 className="font-semibold text-lg text-gray-900">{tenant.name}</h3>
+                    <h3 className="font-semibold text-lg text-gray-900">
+                      {tenant.name}
+                    </h3>
                     <div className="flex items-center gap-1.5 text-xs text-gray-500 mt-0.5">
                       <Calendar className="w-3.5 h-3.5" />
                       <span>NS: {formatDateDisplay(tenant.dateOfBirth)}</span>
@@ -287,8 +408,14 @@ export default function TenantManagement() {
                   </div>
                 </div>
                 <div className="flex flex-col items-end gap-1">
-                  <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${tenant.isActive ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
-                    {tenant.isActive ? 'Đang hoạt động' : 'Tạm khóa'}
+                  <span
+                    className={`px-2 py-0.5 rounded-full text-xs font-medium ${
+                      tenant.isActive
+                        ? "bg-green-100 text-green-700"
+                        : "bg-red-100 text-red-700"
+                    }`}
+                  >
+                    {tenant.isActive ? "Đang hoạt động" : "Tạm khóa"}
                   </span>
                   {tenant.roomNumber && (
                     <span className="text-xs text-blue-600 font-medium bg-blue-50 px-2 py-0.5 rounded">
@@ -301,23 +428,35 @@ export default function TenantManagement() {
               <div className="space-y-2 mb-4 border-t border-gray-100 pt-3">
                 <div className="flex items-center gap-2 text-sm text-gray-700">
                   <Phone className="w-4 h-4 text-gray-400 shrink-0" />
-                  <span>{tenant.phoneNumber || 'Chưa cập nhật SĐT'}</span>
+                  <span>{tenant.phoneNumber || "Chưa cập nhật SĐT"}</span>
                 </div>
                 <div className="flex items-center gap-2 text-sm text-gray-700">
                   <CreditCard className="w-4 h-4 text-gray-400 shrink-0" />
-                  <span>CCCD: <span className="font-medium text-gray-900">{tenant.idCard || 'Chưa cập nhật'}</span></span>
+                  <span>
+                    CCCD:{" "}
+                    <span className="font-medium text-gray-900">
+                      {tenant.idCard || "Chưa cập nhật"}
+                    </span>
+                  </span>
                 </div>
                 <div className="flex items-center gap-2 text-sm text-gray-700">
                   <Mail className="w-4 h-4 text-gray-400 shrink-0" />
-                  <span className="truncate">{tenant.email || 'Chưa liên kết email'}</span>
+                  <span className="truncate">
+                    {tenant.email || "Chưa liên kết email"}
+                  </span>
                 </div>
                 <div className="flex items-center gap-2 text-sm text-gray-700">
                   <MapPin className="w-4 h-4 text-gray-400 shrink-0" />
-                  <span className="line-clamp-1">{tenant.address || 'Chưa khai báo địa chỉ'}</span>
+                  <span className="line-clamp-1">
+                    {tenant.address || "Chưa khai báo địa chỉ"}
+                  </span>
                 </div>
               </div>
 
-              <div className="flex gap-2 pt-2 border-t border-gray-100">
+              <div
+                className="flex gap-2 pt-2 border-t border-gray-100"
+                onClick={(e) => e.stopPropagation()}
+              >
                 <button
                   onClick={() => openEditModal(tenant)}
                   className="flex-1 px-3 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 flex items-center justify-center gap-2 text-sm font-medium transition-colors"
@@ -340,56 +479,85 @@ export default function TenantManagement() {
       <Dialog.Root open={isAddOpen} onOpenChange={setIsAddOpen}>
         <Dialog.Portal>
           <Dialog.Overlay className="fixed inset-0 bg-black/50 z-50 transition-opacity" />
-          <Dialog.Content aria-describedby={undefined} className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-white rounded-lg p-6 w-full max-w-xl max-h-[90vh] overflow-auto z-50 shadow-2xl">
-            <Dialog.Title className="text-xl font-semibold mb-4">Tạo tài khoản khách thuê mới</Dialog.Title>
+          <Dialog.Content
+            aria-describedby={undefined}
+            className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-white rounded-lg p-6 w-full max-w-xl max-h-[90vh] overflow-auto z-50 shadow-2xl"
+          >
+            <Dialog.Title className="text-xl font-semibold mb-4">
+              Tạo tài khoản khách thuê mới
+            </Dialog.Title>
             <form onSubmit={handleAddTenant} className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium mb-1">Họ và tên <span className="text-red-500">*</span></label>
+                  <label className="block text-sm font-medium mb-1">
+                    Họ và tên <span className="text-red-500">*</span>
+                  </label>
                   <input
-                    type="text" required
+                    type="text"
+                    required
                     value={formData.name}
-                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                    onChange={(e) =>
+                      setFormData({ ...formData, name: e.target.value })
+                    }
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-1 focus:ring-black focus:outline-none"
                     placeholder="Nguyễn Văn A"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium mb-1">Số điện thoại <span className="text-red-500">*</span></label>
+                  <label className="block text-sm font-medium mb-1">
+                    Số điện thoại <span className="text-red-500">*</span>
+                  </label>
                   <input
-                    type="text" required
+                    type="text"
+                    required
                     value={formData.phoneNumber}
-                    onChange={(e) => setFormData({ ...formData, phoneNumber: e.target.value })}
+                    onChange={(e) =>
+                      setFormData({ ...formData, phoneNumber: e.target.value })
+                    }
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-1 focus:ring-black focus:outline-none"
                     placeholder="090xxxxxxx"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium mb-1">Số CCCD <span className="text-red-500">*</span></label>
+                  <label className="block text-sm font-medium mb-1">
+                    Số CCCD <span className="text-red-500">*</span>
+                  </label>
                   <input
-                    type="text" required
+                    type="text"
+                    required
                     value={formData.idCard}
-                    onChange={(e) => setFormData({ ...formData, idCard: e.target.value })}
+                    onChange={(e) =>
+                      setFormData({ ...formData, idCard: e.target.value })
+                    }
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-1 focus:ring-black focus:outline-none font-mono"
                     placeholder="079xxxxxxxxxx"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium mb-1">Ngày sinh <span className="text-red-500">*</span></label>
+                  <label className="block text-sm font-medium mb-1">
+                    Ngày sinh <span className="text-red-500">*</span>
+                  </label>
                   <input
-                    type="date" required
+                    type="date"
+                    required
                     value={formData.dateOfBirth}
-                    onChange={(e) => setFormData({ ...formData, dateOfBirth: e.target.value })}
+                    onChange={(e) =>
+                      setFormData({ ...formData, dateOfBirth: e.target.value })
+                    }
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-1 focus:ring-black focus:outline-none"
                   />
                 </div>
                 <div className="md:col-span-2">
-                  <label className="block text-sm font-medium mb-1">Mật khẩu hệ thống <span className="text-red-500">*</span></label>
+                  <label className="block text-sm font-medium mb-1">
+                    Mật khẩu hệ thống <span className="text-red-500">*</span>
+                  </label>
                   <div className="relative">
                     <input
                       type={showPassword ? "text" : "password"}
                       value={formData.password}
-                      onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                      onChange={(e) =>
+                        setFormData({ ...formData, password: e.target.value })
+                      }
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-1 focus:ring-black focus:outline-none"
                       placeholder="••••••••"
                       required
@@ -399,37 +567,77 @@ export default function TenantManagement() {
                       onClick={() => setShowPassword(!showPassword)}
                       className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 focus:outline-none"
                     >
-                      {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                      {showPassword ? (
+                        <EyeOff className="w-5 h-5" />
+                      ) : (
+                        <Eye className="w-5 h-5" />
+                      )}
                     </button>
                   </div>
                 </div>
               </div>
 
               <div>
-                <label className="block text-sm font-medium mb-1">Email liên hệ</label>
+                <label className="block text-sm font-medium mb-1">
+                  Email liên hệ
+                </label>
                 <input
                   type="email"
                   value={formData.email}
-                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                  onChange={(e) =>
+                    setFormData({ ...formData, email: e.target.value })
+                  }
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-1 focus:ring-black focus:outline-none"
                   placeholder="nguyenvana@email.com"
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium mb-1">Địa chỉ thường trú</label>
+                <label className="block text-sm font-medium mb-1">
+                  Địa chỉ thường trú
+                </label>
                 <input
                   type="text"
                   value={formData.address}
-                  onChange={(e) => setFormData({ ...formData, address: e.target.value })}
+                  onChange={(e) =>
+                    setFormData({ ...formData, address: e.target.value })
+                  }
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-1 focus:ring-black focus:outline-none"
                   placeholder="Xã/Phường, Quận/Huyện, Tỉnh Thành"
                 />
               </div>
 
+              {/* Ảnh CCCD */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2 border-t border-gray-100">
+                <ImageUploadField
+                  label="Ảnh CCCD mặt trước"
+                  value={formData.frontImage}
+                  onChange={(file) =>
+                    setFormData({ ...formData, frontImage: file })
+                  }
+                />
+                <ImageUploadField
+                  label="Ảnh CCCD mặt sau"
+                  value={formData.backImage}
+                  onChange={(file) =>
+                    setFormData({ ...formData, backImage: file })
+                  }
+                />
+              </div>
+
               <div className="flex gap-2 pt-4 border-t border-gray-200">
-                <Dialog.Close type="button" className="flex-1 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 text-sm font-medium">Hủy</Dialog.Close>
-                <button type="submit" className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm font-medium">Đăng ký thành viên</button>
+                <Dialog.Close
+                  type="button"
+                  className="flex-1 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 text-sm font-medium"
+                >
+                  Hủy
+                </Dialog.Close>
+                <button
+                  type="submit"
+                  className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm font-medium"
+                >
+                  Đăng ký thành viên
+                </button>
               </div>
             </form>
           </Dialog.Content>
@@ -437,56 +645,90 @@ export default function TenantManagement() {
       </Dialog.Root>
 
       {/* DIALOG CHỈNH SỬA THÔNG TIN */}
-      <Dialog.Root open={isEditOpen} onOpenChange={(open) => !open && setIsEditOpen(false)}>
+      <Dialog.Root
+        open={isEditOpen}
+        onOpenChange={(open) => !open && setIsEditOpen(false)}
+      >
         <Dialog.Portal>
           <Dialog.Overlay className="fixed inset-0 bg-black/50 z-50 transition-opacity" />
-          <Dialog.Content aria-describedby={undefined} className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-white rounded-lg p-6 w-full max-w-xl max-h-[90vh] overflow-auto z-50 shadow-2xl">
-            <Dialog.Title className="text-xl font-semibold mb-4">Cập nhật thông tin tài khoản</Dialog.Title>
+          <Dialog.Content
+            aria-describedby={undefined}
+            className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-white rounded-lg p-6 w-full max-w-xl max-h-[90vh] overflow-auto z-50 shadow-2xl"
+          >
+            <Dialog.Title className="text-xl font-semibold mb-4">
+              Cập nhật thông tin tài khoản
+            </Dialog.Title>
             <form onSubmit={handleUpdateTenant} className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium mb-1">Họ và tên</label>
+                  <label className="block text-sm font-medium mb-1">
+                    Họ và tên
+                  </label>
                   <input
-                    type="text" required
+                    type="text"
+                    required
                     value={formData.name}
-                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                    onChange={(e) =>
+                      setFormData({ ...formData, name: e.target.value })
+                    }
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-1 focus:ring-black focus:outline-none"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium mb-1">Số điện thoại</label>
+                  <label className="block text-sm font-medium mb-1">
+                    Số điện thoại
+                  </label>
                   <input
-                    type="text" required
+                    type="text"
+                    required
                     value={formData.phoneNumber}
-                    onChange={(e) => setFormData({ ...formData, phoneNumber: e.target.value })}
+                    onChange={(e) =>
+                      setFormData({ ...formData, phoneNumber: e.target.value })
+                    }
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-1 focus:ring-black focus:outline-none"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium mb-1">Số CCCD <span className="text-red-500">*</span></label>
+                  <label className="block text-sm font-medium mb-1">
+                    Số CCCD <span className="text-red-500">*</span>
+                  </label>
                   <input
-                    type="text" required
+                    type="text"
+                    required
                     value={formData.idCard}
-                    onChange={(e) => setFormData({ ...formData, idCard: e.target.value })}
+                    onChange={(e) =>
+                      setFormData({ ...formData, idCard: e.target.value })
+                    }
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg font-mono focus:ring-1 focus:ring-black focus:outline-none"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium mb-1">Ngày sinh <span className="text-red-500">*</span></label>
+                  <label className="block text-sm font-medium mb-1">
+                    Ngày sinh <span className="text-red-500">*</span>
+                  </label>
                   <input
                     type="date"
                     required
                     value={formData.dateOfBirth}
-                    onChange={(e) => setFormData({ ...formData, dateOfBirth: e.target.value })}
+                    onChange={(e) =>
+                      setFormData({ ...formData, dateOfBirth: e.target.value })
+                    }
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-1 focus:ring-black focus:outline-none"
                   />
                 </div>
                 <div className="md:col-span-2">
-                  <label className="block text-sm font-medium mb-1">Mật khẩu mới <span className="text-xs text-gray-400">(Bỏ trống nếu giữ nguyên)</span></label>
+                  <label className="block text-sm font-medium mb-1">
+                    Mật khẩu mới{" "}
+                    <span className="text-xs text-gray-400">
+                      (Bỏ trống nếu giữ nguyên)
+                    </span>
+                  </label>
                   <input
                     type="password"
                     value={formData.password}
-                    onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                    onChange={(e) =>
+                      setFormData({ ...formData, password: e.target.value })
+                    }
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-1 focus:ring-black focus:outline-none"
                     placeholder="Nhập mật khẩu mới"
                   />
@@ -498,45 +740,253 @@ export default function TenantManagement() {
                 <input
                   type="email"
                   value={formData.email}
-                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                  onChange={(e) =>
+                    setFormData({ ...formData, email: e.target.value })
+                  }
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-1 focus:ring-black focus:outline-none"
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium mb-1">Địa chỉ</label>
+                <label className="block text-sm font-medium mb-1">
+                  Địa chỉ
+                </label>
                 <input
                   type="text"
                   value={formData.address}
-                  onChange={(e) => setFormData({ ...formData, address: e.target.value })}
+                  onChange={(e) =>
+                    setFormData({ ...formData, address: e.target.value })
+                  }
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-1 focus:ring-black focus:outline-none"
                 />
               </div>
 
+              {/* Ảnh CCCD */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2 border-t border-gray-100">
+                <ImageUploadField
+                  label="Ảnh CCCD mặt trước (để trống nếu không đổi)"
+                  value={formData.frontImage}
+                  onChange={(file) =>
+                    setFormData({ ...formData, frontImage: file })
+                  }
+                />
+                <ImageUploadField
+                  label="Ảnh CCCD mặt sau (để trống nếu không đổi)"
+                  value={formData.backImage}
+                  onChange={(file) =>
+                    setFormData({ ...formData, backImage: file })
+                  }
+                />
+              </div>
+
               <div className="flex gap-2 pt-4 border-t border-gray-200">
-                <Dialog.Close type="button" className="flex-1 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 text-sm font-medium">Hủy</Dialog.Close>
-                <button type="submit" className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm font-medium">Lưu thay đổi</button>
+                <Dialog.Close
+                  type="button"
+                  className="flex-1 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 text-sm font-medium"
+                >
+                  Hủy
+                </Dialog.Close>
+                <button
+                  type="submit"
+                  className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm font-medium"
+                >
+                  Lưu thay đổi
+                </button>
               </div>
             </form>
           </Dialog.Content>
         </Dialog.Portal>
       </Dialog.Root>
 
-      {/* DIALOG XÁC NHẬN XÓA */}
-      <Dialog.Root open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+      {/* DIALOG CHI TIẾT NGƯỜI DÙNG */}
+      <Dialog.Root open={isDetailOpen} onOpenChange={setIsDetailOpen}>
         <Dialog.Portal>
           <Dialog.Overlay className="fixed inset-0 bg-black/50 z-50 transition-opacity" />
-          <Dialog.Content aria-describedby={undefined} className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-white rounded-lg p-6 w-full max-w-sm shadow-xl border border-gray-200 z-50">
+          <Dialog.Content
+            aria-describedby={undefined}
+            className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-white rounded-lg p-6 w-full max-w-2xl max-h-[90vh] overflow-auto z-50 shadow-2xl"
+          >
+            <Dialog.Title className="text-xl font-semibold mb-1">
+              Chi tiết khách thuê
+            </Dialog.Title>
+            <p className="text-sm text-gray-500 mb-5">
+              Thông tin đầy đủ của người thuê
+            </p>
+
+            {selectedTenantDetail && (
+              <div className="space-y-5">
+                {/* Header thông tin cơ bản */}
+                <div className="flex items-center gap-4">
+                  {selectedTenantDetail.avatarUrl ? (
+                    <img
+                      src={selectedTenantDetail.avatarUrl}
+                      alt={selectedTenantDetail.name}
+                      className="w-16 h-16 rounded-full object-cover"
+                    />
+                  ) : (
+                    <div className="w-16 h-16 bg-linear-to-br from-blue-500 to-indigo-600 rounded-full flex items-center justify-center text-white text-xl font-semibold">
+                      {selectedTenantDetail.name?.charAt(0).toUpperCase() ||
+                        "U"}
+                    </div>
+                  )}
+                  <div>
+                    <h3 className="text-lg font-semibold text-gray-900">
+                      {selectedTenantDetail.name}
+                    </h3>
+                    <div className="flex items-center gap-2 mt-1">
+                      <span
+                        className={`px-2 py-0.5 rounded-full text-xs font-medium ${
+                          selectedTenantDetail.isActive
+                            ? "bg-green-100 text-green-700"
+                            : "bg-red-100 text-red-700"
+                        }`}
+                      >
+                        {selectedTenantDetail.isActive
+                          ? "Đang hoạt động"
+                          : "Tạm khóa"}
+                      </span>
+                      {selectedTenantDetail.roomNumber && (
+                        <span className="text-xs text-blue-600 font-medium bg-blue-50 px-2 py-0.5 rounded">
+                          Phòng: {selectedTenantDetail.roomNumber}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Thông tin chi tiết */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                  <div className="space-y-1">
+                    <p className="text-gray-500">Số điện thoại</p>
+                    <p className="font-medium">
+                      {selectedTenantDetail.phoneNumber || "—"}
+                    </p>
+                  </div>
+                  <div className="space-y-1">
+                    <p className="text-gray-500">Số CCCD</p>
+                    <p className="font-medium font-mono">
+                      {selectedTenantDetail.idCard || "—"}
+                    </p>
+                  </div>
+                  <div className="space-y-1">
+                    <p className="text-gray-500">Ngày sinh</p>
+                    <p className="font-medium">
+                      {formatDateDisplay(selectedTenantDetail.dateOfBirth)}
+                    </p>
+                  </div>
+                  <div className="space-y-1">
+                    <p className="text-gray-500">Email</p>
+                    <p className="font-medium break-all">
+                      {selectedTenantDetail.email || "—"}
+                    </p>
+                  </div>
+                  <div className="md:col-span-2 space-y-1">
+                    <p className="text-gray-500">Địa chỉ thường trú</p>
+                    <p className="font-medium">
+                      {selectedTenantDetail.address || "—"}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Ảnh CCCD */}
+                <div className="pt-4 border-t border-gray-100">
+                  <h4 className="text-sm font-semibold text-gray-800 mb-3">
+                    Ảnh CCCD
+                  </h4>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {/* Mặt trước */}
+                    <div>
+                      <p className="text-xs text-gray-500 mb-1.5">Mặt trước</p>
+                      {getFrontImageUrl(selectedTenantDetail) ? (
+                        <img
+                          src={getFrontImageUrl(selectedTenantDetail)!}
+                          alt="CCCD mặt trước"
+                          className="w-full h-48 object-contain rounded-lg border border-gray-200 bg-gray-50 cursor-zoom-in hover:opacity-90 transition-opacity"
+                          onClick={() =>
+                            window.open(
+                              getFrontImageUrl(selectedTenantDetail)!,
+                              "_blank",
+                            )
+                          }
+                        />
+                      ) : (
+                        <div className="w-full h-48 flex items-center justify-center rounded-lg border border-dashed border-gray-300 bg-gray-50 text-gray-400 text-sm">
+                          Chưa có ảnh
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Mặt sau */}
+                    <div>
+                      <p className="text-xs text-gray-500 mb-1.5">Mặt sau</p>
+                      {getBackImageUrl(selectedTenantDetail) ? (
+                        <img
+                          src={getBackImageUrl(selectedTenantDetail)!}
+                          alt="CCCD mặt sau"
+                          className="w-full h-48 object-contain rounded-lg border border-gray-200 bg-gray-50 cursor-zoom-in hover:opacity-90 transition-opacity"
+                          onClick={() =>
+                            window.open(
+                              getBackImageUrl(selectedTenantDetail)!,
+                              "_blank",
+                            )
+                          }
+                        />
+                      ) : (
+                        <div className="w-full h-48 flex items-center justify-center rounded-lg border border-dashed border-gray-300 bg-gray-50 text-gray-400 text-sm">
+                          Chưa có ảnh
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Nút hành động */}
+                <div className="flex gap-2 pt-4 border-t border-gray-200">
+                  <Dialog.Close className="flex-1 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 text-sm font-medium">
+                    Đóng
+                  </Dialog.Close>
+                  <button
+                    onClick={() => {
+                      setIsDetailOpen(false);
+                      openEditModal(selectedTenantDetail);
+                    }}
+                    className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm font-medium flex items-center justify-center gap-2"
+                  >
+                    <Edit className="w-4 h-4" /> Sửa thông tin
+                  </button>
+                </div>
+              </div>
+            )}
+          </Dialog.Content>
+        </Dialog.Portal>
+      </Dialog.Root>
+
+      {/* DIALOG XÁC NHẬN XÓA */}
+      <Dialog.Root
+        open={isDeleteDialogOpen}
+        onOpenChange={setIsDeleteDialogOpen}
+      >
+        <Dialog.Portal>
+          <Dialog.Overlay className="fixed inset-0 bg-black/50 z-50 transition-opacity" />
+          <Dialog.Content
+            aria-describedby={undefined}
+            className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-white rounded-lg p-6 w-full max-w-sm shadow-xl border border-gray-200 z-50"
+          >
             <Dialog.Title className="text-lg font-semibold text-gray-900 mb-2">
               Xác nhận xóa tài khoản
             </Dialog.Title>
 
             <div className="text-sm text-gray-500 mb-5 space-y-2">
               <p>
-                Bạn có chắc chắn muốn xóa khách thuê <strong className="text-gray-800">{tenantToDelete?.name}</strong> khỏi hệ thống?
+                Bạn có chắc chắn muốn xóa khách thuê{" "}
+                <strong className="text-gray-800">
+                  {tenantToDelete?.name}
+                </strong>{" "}
+                khỏi hệ thống?
               </p>
               <p className="text-red-500 text-xs font-medium">
-                * Hành động này sẽ loại bỏ hoàn toàn dữ liệu của khách và không thể khôi phục lại.
+                * Hành động này sẽ loại bỏ hoàn toàn dữ liệu của khách và không
+                thể khôi phục lại.
               </p>
             </div>
 
