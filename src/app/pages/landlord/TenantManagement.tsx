@@ -37,7 +37,7 @@ interface UserTenant {
   backImage?: string | null;
 }
 
-// Cấu trúc Form (thêm 2 field ảnh)
+// Cấu trúc Form
 const blankTenantFormData = {
   name: "",
   password: "",
@@ -110,7 +110,6 @@ export default function TenantManagement() {
       fd.append("DateOfBirth", new Date(formData.dateOfBirth).toISOString());
     }
 
-    // Ảnh CCCD (chỉ append khi có file)
     if (formData.frontImage) {
       fd.append("FrontImage", formData.frontImage);
     }
@@ -286,14 +285,12 @@ export default function TenantManagement() {
       tenant.email?.toLowerCase().includes(searchTerm.toLowerCase()),
   );
 
-  // Helper lấy URL ảnh linh hoạt theo tên trường trả về từ Backend
   const getFrontImageUrl = (tenant: UserTenant) =>
     tenant.frontImageUrl || tenant.frontImage || null;
 
   const getBackImageUrl = (tenant: UserTenant) =>
     tenant.backImageUrl || tenant.backImage || null;
 
-  // Component nhỏ hiển thị input file ảnh CCCD
   const ImageUploadField = ({
     label,
     value,
@@ -378,100 +375,123 @@ export default function TenantManagement() {
         </div>
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          {filteredTenants.map((tenant) => (
-            <div
-              key={tenant.id}
-              onClick={() => openDetailModal(tenant)}
-              className="bg-white rounded-lg border border-gray-200 p-5 hover:shadow-lg transition-shadow cursor-pointer"
-            >
-              <div className="flex items-start justify-between mb-4">
-                <div className="flex items-center gap-3">
-                  {tenant.avatarUrl ? (
-                    <img
-                      src={tenant.avatarUrl}
-                      alt={tenant.name}
-                      className="w-12 h-12 rounded-full object-cover"
-                    />
-                  ) : (
-                    <div className="w-12 h-12 bg-linear-to-br from-blue-500 to-indigo-600 rounded-full flex items-center justify-center text-white font-semibold">
-                      {tenant.name ? tenant.name.charAt(0).toUpperCase() : "U"}
+          {filteredTenants.map((tenant) => {
+            const isInactive = !tenant.isActive;
+
+            return (
+              <div
+                key={tenant.id}
+                onClick={() => openDetailModal(tenant)}
+                className={`rounded-lg border border-gray-200 p-5 hover:shadow-lg transition-all cursor-pointer flex flex-col justify-between ${
+                  isInactive ? "bg-gray-100 opacity-80" : "bg-white"
+                }`}
+              >
+                <div>
+                  <div className="flex items-start justify-between mb-4">
+                    <div className="flex items-center gap-3">
+                      {tenant.avatarUrl ? (
+                        <img
+                          src={tenant.avatarUrl}
+                          alt={tenant.name}
+                          className="w-12 h-12 rounded-full object-cover"
+                        />
+                      ) : (
+                        <div className="w-12 h-12 bg-linear-to-br from-blue-500 to-indigo-600 rounded-full flex items-center justify-center text-white font-semibold">
+                          {tenant.name
+                            ? tenant.name.charAt(0).toUpperCase()
+                            : "U"}
+                        </div>
+                      )}
+                      <div>
+                        <h3 className="font-semibold text-lg text-gray-900">
+                          {tenant.name}
+                        </h3>
+                        <div className="flex items-center gap-1.5 text-xs text-gray-500 mt-0.5">
+                          <Calendar className="w-3.5 h-3.5" />
+                          <span>
+                            NS: {formatDateDisplay(tenant.dateOfBirth)}
+                          </span>
+                        </div>
+                      </div>
                     </div>
-                  )}
-                  <div>
-                    <h3 className="font-semibold text-lg text-gray-900">
-                      {tenant.name}
-                    </h3>
-                    <div className="flex items-center gap-1.5 text-xs text-gray-500 mt-0.5">
-                      <Calendar className="w-3.5 h-3.5" />
-                      <span>NS: {formatDateDisplay(tenant.dateOfBirth)}</span>
+                    <div className="flex flex-col items-end gap-1">
+                      <span
+                        className={`px-2 py-0.5 rounded-full text-xs font-medium ${
+                          tenant.isActive
+                            ? "bg-green-100 text-green-700"
+                            : "bg-red-100 text-red-700"
+                        }`}
+                      >
+                        {tenant.isActive ? "Đang hoạt động" : "Tạm khóa"}
+                      </span>
+                      {tenant.roomNumber && (
+                        <span className="text-xs text-blue-600 font-medium bg-blue-50 px-2 py-0.5 rounded">
+                          Phòng: {tenant.roomNumber}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="space-y-2 mb-4 border-t border-gray-100 pt-3">
+                    <div className="flex items-center gap-2 text-sm text-gray-700">
+                      <Phone className="w-4 h-4 text-gray-400 shrink-0" />
+                      <span>{tenant.phoneNumber || "Chưa cập nhật SĐT"}</span>
+                    </div>
+                    <div className="flex items-center gap-2 text-sm text-gray-700">
+                      <CreditCard className="w-4 h-4 text-gray-400 shrink-0" />
+                      <span>
+                        CCCD:{" "}
+                        <span className="font-medium text-gray-900">
+                          {tenant.idCard || "Chưa cập nhật"}
+                        </span>
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2 text-sm text-gray-700">
+                      <Mail className="w-4 h-4 text-gray-400 shrink-0" />
+                      <span className="truncate">
+                        {tenant.email || "Chưa liên kết email"}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2 text-sm text-gray-700">
+                      <MapPin className="w-4 h-4 text-gray-400 shrink-0" />
+                      <span className="line-clamp-1">
+                        {tenant.address || "Chưa khai báo địa chỉ"}
+                      </span>
                     </div>
                   </div>
                 </div>
-                <div className="flex flex-col items-end gap-1">
-                  <span
-                    className={`px-2 py-0.5 rounded-full text-xs font-medium ${
-                      tenant.isActive
-                        ? "bg-green-100 text-green-700"
-                        : "bg-red-100 text-red-700"
-                    }`}
+
+                {/* Nhóm nút hành động */}
+                <div
+                  className="flex gap-2 pt-2 border-t border-gray-100 mt-auto"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <button
+                    onClick={() => openEditModal(tenant)}
+                    className="flex-1 px-3 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 flex items-center justify-center gap-2 text-sm font-medium transition-colors bg-white"
                   >
-                    {tenant.isActive ? "Đang hoạt động" : "Tạm khóa"}
-                  </span>
-                  {tenant.roomNumber && (
-                    <span className="text-xs text-blue-600 font-medium bg-blue-50 px-2 py-0.5 rounded">
-                      Phòng: {tenant.roomNumber}
-                    </span>
+                    <Edit className="w-4 h-4" /> Sửa thông tin
+                  </button>
+                  {isInactive ? (
+                    <button
+                      disabled
+                      className="px-3 py-2 border border-gray-300 bg-gray-200 text-gray-400 rounded-lg cursor-not-allowed flex items-center justify-center"
+                      title="Tài khoản đang bị tạm khóa"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  ) : (
+                    <button
+                      onClick={() => openDeleteModal(tenant)}
+                      className="px-3 py-2 border border-red-200 text-red-600 rounded-lg hover:bg-red-50 transition-colors bg-white"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
                   )}
                 </div>
               </div>
-
-              <div className="space-y-2 mb-4 border-t border-gray-100 pt-3">
-                <div className="flex items-center gap-2 text-sm text-gray-700">
-                  <Phone className="w-4 h-4 text-gray-400 shrink-0" />
-                  <span>{tenant.phoneNumber || "Chưa cập nhật SĐT"}</span>
-                </div>
-                <div className="flex items-center gap-2 text-sm text-gray-700">
-                  <CreditCard className="w-4 h-4 text-gray-400 shrink-0" />
-                  <span>
-                    CCCD:{" "}
-                    <span className="font-medium text-gray-900">
-                      {tenant.idCard || "Chưa cập nhật"}
-                    </span>
-                  </span>
-                </div>
-                <div className="flex items-center gap-2 text-sm text-gray-700">
-                  <Mail className="w-4 h-4 text-gray-400 shrink-0" />
-                  <span className="truncate">
-                    {tenant.email || "Chưa liên kết email"}
-                  </span>
-                </div>
-                <div className="flex items-center gap-2 text-sm text-gray-700">
-                  <MapPin className="w-4 h-4 text-gray-400 shrink-0" />
-                  <span className="line-clamp-1">
-                    {tenant.address || "Chưa khai báo địa chỉ"}
-                  </span>
-                </div>
-              </div>
-
-              <div
-                className="flex gap-2 pt-2 border-t border-gray-100"
-                onClick={(e) => e.stopPropagation()}
-              >
-                <button
-                  onClick={() => openEditModal(tenant)}
-                  className="flex-1 px-3 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 flex items-center justify-center gap-2 text-sm font-medium transition-colors"
-                >
-                  <Edit className="w-4 h-4" /> Sửa thông tin
-                </button>
-                <button
-                  onClick={() => openDeleteModal(tenant)}
-                  className="px-3 py-2 border border-red-200 text-red-600 rounded-lg hover:bg-red-50 transition-colors"
-                >
-                  <Trash2 className="w-4 h-4" />
-                </button>
-              </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
 
