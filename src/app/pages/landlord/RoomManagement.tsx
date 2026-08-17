@@ -553,7 +553,7 @@ export default function RoomManagement() {
                       </div>
                     </div>
 
-                    <div className="border-t border-gray-100 pt-2 mb-4 min-h-[56px] flex flex-col justify-center">
+                    <div className="border-t border-gray-100 pt-2 mb-4 min-height: 56px; flex flex-col justify-center">
                       {room.description ? (
                         <p className="text-xs text-gray-500 italic line-clamp-1 mb-1">
                           Ghi chú: {room.description}
