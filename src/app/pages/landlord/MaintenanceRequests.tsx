@@ -1,8 +1,17 @@
-import { useState, useEffect, useMemo } from 'react';
-import { Search, CheckCircle, Clock, Wrench, AlertCircle, ChevronLeft, ChevronRight } from 'lucide-react';
-import * as Dialog from '@radix-ui/react-dialog';
-import { toast } from 'sonner';
-import { fetchApi } from '../../api/fetchApi';
+import { useState, useEffect, useMemo } from "react";
+import {
+  Search,
+  CheckCircle,
+  Clock,
+  Wrench,
+  AlertCircle,
+  ChevronLeft,
+  ChevronRight,
+  Loader2,
+} from "lucide-react";
+import * as Dialog from "@radix-ui/react-dialog";
+import { toast } from "sonner";
+import { fetchApi } from "../../api/fetchApi";
 
 // INTERFACES
 interface MaintenanceItem {
@@ -18,6 +27,8 @@ interface MaintenanceItem {
   statusLabel: string;
   createdAt: string;
   images?: string[];
+  adminNote?: string | null;
+  note?: string | null;
 }
 
 interface ApiResponse {
@@ -28,35 +39,37 @@ interface ApiResponse {
   items: MaintenanceItem[];
 }
 
-type SortKey = 'priority-desc' | 'date-desc' | 'date-asc' | 'room-asc';
+type SortKey = "priority-desc" | "date-desc" | "date-asc" | "room-asc";
 
 export default function MaintenanceRequests() {
   const [apiData, setApiData] = useState<ApiResponse | null>(null);
   const [isLoading, setIsLoading] = useState(false);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [filterStatus, setFilterStatus] = useState<string>('all');
-  const [filterPriority, setFilterPriority] = useState<string>('all');
-  const [sortBy, setSortBy] = useState<SortKey>('priority-desc'); // Mặc định: Ưu tiên cao nhất lên đầu
-  const [selectedRequest, setSelectedRequest] = useState<MaintenanceItem | null>(null);
-  const [adminNote, setAdminNote] = useState('');
+  const [isSavingNote, setIsSavingNote] = useState(false);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [filterStatus, setFilterStatus] = useState<string>("all");
+  const [filterPriority, setFilterPriority] = useState<string>("all");
+  const [sortBy, setSortBy] = useState<SortKey>("priority-desc");
+  const [selectedRequest, setSelectedRequest] =
+    useState<MaintenanceItem | null>(null);
+  const [adminNote, setAdminNote] = useState("");
 
   // Phân trang
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 5;
 
-  // Hàm GET: Lấy dữ liệu 
+  // Hàm GET: Lấy dữ liệu
   const fetchRequests = async () => {
     try {
       setIsLoading(true);
-      const response = await fetchApi('/MaintenanceRequests');
+      const response = await fetchApi("/MaintenanceRequests");
 
-      if (!response.ok) throw new Error('Không thể tải dữ liệu');
+      if (!response.ok) throw new Error("Không thể tải dữ liệu");
 
       const data: ApiResponse = await response.json();
       setApiData(data);
     } catch (error) {
-      toast.error('Lỗi khi tải lịch sử sửa chữa từ server!');
-      console.error('Lỗi tải lịch sử sửa chữa:', error);
+      toast.error("Lỗi khi tải lịch sử sửa chữa từ server!");
+      console.error("Lỗi tải lịch sử sửa chữa:", error);
     } finally {
       setIsLoading(false);
     }
@@ -66,34 +79,75 @@ export default function MaintenanceRequests() {
     fetchRequests();
   }, []);
 
-  // Tải ghi chú từ LocalStorage khi chọn sự cố khác nhau
+  // Đồng bộ ghi chú khi chọn một yêu cầu
   useEffect(() => {
     if (selectedRequest) {
-      const savedNote = localStorage.getItem(`note_maintenance_${selectedRequest.id}`);
-      setAdminNote(savedNote || '');
+      setAdminNote(selectedRequest.adminNote || selectedRequest.note || "");
     } else {
-      setAdminNote('');
+      setAdminNote("");
     }
   }, [selectedRequest]);
 
   // Tự động mở chi tiết nếu chuyển tiếp từ trang thông báo
   useEffect(() => {
     if (apiData && apiData.items) {
-      const pendingDetailId = localStorage.getItem('detail_maintenance_id');
+      const pendingDetailId = localStorage.getItem("detail_maintenance_id");
       if (pendingDetailId) {
-        const found = apiData.items.find(item => item.id === pendingDetailId);
+        const found = apiData.items.find((item) => item.id === pendingDetailId);
         if (found) {
           setSelectedRequest(found);
         }
-        localStorage.removeItem('detail_maintenance_id');
+        localStorage.removeItem("detail_maintenance_id");
       }
     }
   }, [apiData]);
 
-  const handleSaveNote = () => {
+  // Hàm PUT: Lưu ghi chú qua API /MaintenanceRequests/{id}/note
+  const handleSaveNote = async () => {
     if (!selectedRequest) return;
-    localStorage.setItem(`note_maintenance_${selectedRequest.id}`, adminNote);
-    toast.success('Đã lưu ghi chú thành công!');
+    try {
+      setIsSavingNote(true);
+      const response = await fetchApi(
+        `/MaintenanceRequests/${selectedRequest.id}/note`,
+        {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(adminNote),
+        },
+      );
+
+      if (response.ok) {
+        toast.success("Đã lưu ghi chú thành công!");
+
+        // Cập nhật lại state của selectedRequest và danh sách hiển thị
+        setSelectedRequest((prev) =>
+          prev ? { ...prev, adminNote: adminNote, note: adminNote } : null,
+        );
+        setApiData((prev) => {
+          if (!prev) return prev;
+          return {
+            ...prev,
+            items: prev.items.map((item) =>
+              item.id === selectedRequest.id
+                ? { ...item, adminNote: adminNote, note: adminNote }
+                : item,
+            ),
+          };
+        });
+      } else {
+        const errorData = await response.json().catch(() => null);
+        const errMsg =
+          errorData?.message || errorData?.title || "Lỗi khi lưu ghi chú!";
+        toast.error(errMsg);
+      }
+    } catch (error) {
+      console.error("Lỗi khi lưu ghi chú:", error);
+      toast.error("Lỗi kết nối khi lưu ghi chú!");
+    } finally {
+      setIsSavingNote(false);
+    }
   };
 
   // Reset về trang 1 khi thay đổi bất kỳ bộ lọc hoặc kiểu sắp xếp nào
@@ -105,19 +159,19 @@ export default function MaintenanceRequests() {
   const handleStartProcess = async (id: string) => {
     try {
       const response = await fetchApi(`/MaintenanceRequests/${id}/start`, {
-        method: 'PUT',
+        method: "PUT",
       });
 
       if (response.ok) {
-        toast.success('Đã chuyển trạng thái sang Đang xử lý!');
+        toast.success("Đã chuyển trạng thái sang Đang xử lý!");
         setSelectedRequest(null);
         fetchRequests();
       } else {
-        throw new Error('Cập nhật thất bại');
+        throw new Error("Cập nhật thất bại");
       }
     } catch (error) {
       console.error(error);
-      toast.error('Lỗi khi cập nhật trạng thái xử lý!');
+      toast.error("Lỗi khi cập nhật trạng thái xử lý!");
     }
   };
 
@@ -125,52 +179,70 @@ export default function MaintenanceRequests() {
   const handleCompleteProcess = async (id: string) => {
     try {
       const response = await fetchApi(`/MaintenanceRequests/${id}/complete`, {
-        method: 'PUT',
+        method: "PUT",
       });
 
       if (response.ok) {
-        toast.success('Đã hoàn thành xử lý yêu cầu!');
+        toast.success("Đã hoàn thành xử lý yêu cầu!");
         setSelectedRequest(null);
         fetchRequests();
       } else {
-        throw new Error('Cập nhật thất bại');
+        throw new Error("Cập nhật thất bại");
       }
     } catch (error) {
       console.error(error);
-      toast.error('Lỗi khi hoàn thành yêu cầu sửa chữa!');
+      toast.error("Lỗi khi hoàn thành yêu cầu sửa chữa!");
     }
   };
 
   // XỬ LÝ LỌC VÀ SẮP XẾP DỮ LIỆU
   const processedRequests = useMemo(() => {
     const items = apiData?.items || [];
-    
-    // 1. Lọc dữ liệu
-    const filtered = items.filter(request => {
-      const matchesSearch = (request.requestNumber || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-        (request.tenantName || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-        (request.roomNumber || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-        (request.title || '').toLowerCase().includes(searchTerm.toLowerCase());
 
-      const matchesFilter = filterStatus === 'all' || String(request.status) === filterStatus;
-      const matchesPriority = filterPriority === 'all' || String(request.priority) === filterPriority;
+    // 1. Lọc dữ liệu
+    const filtered = items.filter((request) => {
+      const matchesSearch =
+        (request.requestNumber || "")
+          .toLowerCase()
+          .includes(searchTerm.toLowerCase()) ||
+        (request.tenantName || "")
+          .toLowerCase()
+          .includes(searchTerm.toLowerCase()) ||
+        (request.roomNumber || "")
+          .toLowerCase()
+          .includes(searchTerm.toLowerCase()) ||
+        (request.title || "").toLowerCase().includes(searchTerm.toLowerCase());
+
+      const matchesFilter =
+        filterStatus === "all" || String(request.status) === filterStatus;
+      const matchesPriority =
+        filterPriority === "all" || String(request.priority) === filterPriority;
 
       return matchesSearch && matchesFilter && matchesPriority;
     });
 
     // 2. Sắp xếp dữ liệu
     return filtered.sort((a, b) => {
-      if (sortBy === 'priority-desc') {
-        return (b.priority - a.priority) || new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+      if (sortBy === "priority-desc") {
+        return (
+          b.priority - a.priority ||
+          new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+        );
       }
-      if (sortBy === 'date-desc') {
-        return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+      if (sortBy === "date-desc") {
+        return (
+          new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+        );
       }
-      if (sortBy === 'date-asc') {
-        return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+      if (sortBy === "date-asc") {
+        return (
+          new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+        );
       }
-      if (sortBy === 'room-asc') {
-        return a.roomNumber.localeCompare(b.roomNumber, undefined, { numeric: true });
+      if (sortBy === "room-asc") {
+        return a.roomNumber.localeCompare(b.roomNumber, undefined, {
+          numeric: true,
+        });
       }
       return 0;
     });
@@ -181,35 +253,56 @@ export default function MaintenanceRequests() {
   const totalPages = Math.ceil(totalItems / itemsPerPage);
   const indexOfLastItem = currentPage * itemsPerPage;
   const indexOfFirstItem = indexOfLastItem - itemsPerPage;
-  const currentRequests = processedRequests.slice(indexOfFirstItem, indexOfLastItem);
+  const currentRequests = processedRequests.slice(
+    indexOfFirstItem,
+    indexOfLastItem,
+  );
 
   const getStatusBadge = (status: number, label: string) => {
     const configs = {
-      0: { icon: Clock, className: 'bg-yellow-100 text-yellow-700 border-yellow-200' },
-      1: { icon: Wrench, className: 'bg-blue-100 text-blue-700 border-blue-200' },
-      2: { icon: CheckCircle, className: 'bg-green-100 text-green-700 border-green-200' },
+      0: {
+        icon: Clock,
+        className: "bg-yellow-100 text-yellow-700 border-yellow-200",
+      },
+      1: {
+        icon: Wrench,
+        className: "bg-blue-100 text-blue-700 border-blue-200",
+      },
+      2: {
+        icon: CheckCircle,
+        className: "bg-green-100 text-green-700 border-green-200",
+      },
     };
-    const config = configs[status as keyof typeof configs] || { icon: Clock, className: 'bg-gray-100 text-gray-700 border-gray-200' };
+    const config = configs[status as keyof typeof configs] || {
+      icon: Clock,
+      className: "bg-gray-100 text-gray-700 border-gray-200",
+    };
     const Icon = config.icon;
     return (
-      <span className={`flex items-center gap-1 px-2.5 py-0.5 border rounded-full text-xs font-medium ${config.className}`}>
+      <span
+        className={`flex items-center gap-1 px-2.5 py-0.5 border rounded-full text-xs font-medium ${config.className}`}
+      >
         <Icon className="w-3.5 h-3.5" />
-        {label || 'Chờ xử lý'}
+        {label || "Chờ xử lý"}
       </span>
     );
   };
 
   const getPriorityBadge = (priority: number, label: string) => {
     const configs = {
-      0: { className: 'bg-gray-100 text-gray-700 border-gray-200' }, 
-      1: { className: 'bg-blue-100 text-blue-700 border-blue-200' }, 
-      2: { className: 'bg-orange-100 text-orange-700 border-orange-200' }, 
-      3: { className: 'bg-red-100 text-red-700 border-red-200' }, 
+      0: { className: "bg-gray-100 text-gray-700 border-gray-200" },
+      1: { className: "bg-blue-100 text-blue-700 border-blue-200" },
+      2: { className: "bg-orange-100 text-orange-700 border-orange-200" },
+      3: { className: "bg-red-100 text-red-700 border-red-200" },
     };
-    const config = configs[priority as keyof typeof configs] || { className: 'bg-gray-100 text-gray-700 border-gray-200' };
+    const config = configs[priority as keyof typeof configs] || {
+      className: "bg-gray-100 text-gray-700 border-gray-200",
+    };
     return (
-      <span className={`px-2 py-0.5 border rounded text-xs font-semibold ${config.className}`}>
-        {label || 'Bình thường'}
+      <span
+        className={`px-2 py-0.5 border rounded text-xs font-semibold ${config.className}`}
+      >
+        {label || "Bình thường"}
       </span>
     );
   };
@@ -218,7 +311,9 @@ export default function MaintenanceRequests() {
     <div className="p-6 max-w-7xl mx-auto">
       <div className="mb-6">
         <h1 className="text-2xl font-semibold mb-1">Yêu cầu sửa chữa</h1>
-        <p className="text-gray-600 text-sm">Xử lý các yêu cầu sửa chữa cơ sở vật chất thời gian thực</p>
+        <p className="text-gray-600 text-sm">
+          Xử lý các yêu cầu sửa chữa cơ sở vật chất thời gian thực
+        </p>
       </div>
 
       {/* Khối thống kê */}
@@ -229,15 +324,21 @@ export default function MaintenanceRequests() {
         </div>
         <div className="bg-yellow-50 p-4 rounded-xl border border-yellow-200 shadow-sm">
           <p className="text-yellow-700 text-xs font-medium mb-1">Chờ xử lý</p>
-          <p className="text-2xl font-semibold text-yellow-700">{apiData?.pending || 0}</p>
+          <p className="text-2xl font-semibold text-yellow-700">
+            {apiData?.pending || 0}
+          </p>
         </div>
         <div className="bg-blue-50 p-4 rounded-xl border border-blue-200 shadow-sm">
           <p className="text-blue-700 text-xs font-medium mb-1">Đang xử lý</p>
-          <p className="text-2xl font-semibold text-blue-700">{apiData?.inProgress || 0}</p>
+          <p className="text-2xl font-semibold text-blue-700">
+            {apiData?.inProgress || 0}
+          </p>
         </div>
         <div className="bg-green-50 p-4 rounded-xl border border-green-200 shadow-sm">
           <p className="text-green-700 text-xs font-medium mb-1">Hoàn thành</p>
-          <p className="text-2xl font-semibold text-green-700">{apiData?.completed || 0}</p>
+          <p className="text-2xl font-semibold text-green-700">
+            {apiData?.completed || 0}
+          </p>
         </div>
       </div>
 
@@ -307,63 +408,84 @@ export default function MaintenanceRequests() {
             Không có yêu cầu nào trùng khớp với tiêu chí tìm kiếm.
           </div>
         ) : (
-          currentRequests.map((request) => (
-            <div key={request.id} className="bg-white rounded-xl border border-gray-200 p-5 hover:shadow-md transition-all shadow-sm">
-              <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3 mb-4">
-                <div>
-                  <div className="flex flex-wrap items-center gap-2 mb-1.5">
-                    <h3 className="font-semibold text-gray-900">{request.requestNumber || `ID: ${request.id.slice(0, 8)}`}</h3>
-                    {getPriorityBadge(request.priority, request.priorityLabel)}
-                    {getStatusBadge(request.status, request.statusLabel)}
-                    {localStorage.getItem(`note_maintenance_${request.id}`) && (
-                      <span className="text-[10px] bg-indigo-50 text-indigo-600 px-2 py-0.5 rounded border border-indigo-200 font-semibold select-none">
-                        Có ghi chú
-                      </span>
-                    )}
-                  </div>
-                  <p className="text-gray-600 text-sm">Phòng: <strong>{request.roomNumber}</strong> — Người thuê: {request.tenantName}</p>
-                </div>
-                <span className="text-xs text-gray-400 whitespace-nowrap self-start sm:self-center bg-gray-50 px-2.5 py-1 rounded-md border border-gray-100">
-                  {request.createdAt ? new Date(request.createdAt).toLocaleString('vi-VN') : '---'}
-                </span>
-              </div>
-
-              <div className="mb-4 bg-gray-50/50 p-3 rounded-lg border border-gray-100">
-                <div className="flex items-start gap-2">
-                  <AlertCircle className="w-4 h-4 text-orange-500 shrink-0 mt-0.5" />
+          currentRequests.map((request) => {
+            const hasNote = Boolean(request.adminNote || request.note);
+            return (
+              <div
+                key={request.id}
+                className="bg-white rounded-xl border border-gray-200 p-5 hover:shadow-md transition-all shadow-sm"
+              >
+                <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3 mb-4">
                   <div>
-                    <p className="font-medium text-sm text-gray-900">{request.title}</p>
-                    <p className="text-xs text-gray-600 mt-1 leading-relaxed line-clamp-2">{request.description}</p>
+                    <div className="flex flex-wrap items-center gap-2 mb-1.5">
+                      <h3 className="font-semibold text-gray-900">
+                        {request.requestNumber ||
+                          `ID: ${request.id.slice(0, 8)}`}
+                      </h3>
+                      {getPriorityBadge(
+                        request.priority,
+                        request.priorityLabel,
+                      )}
+                      {getStatusBadge(request.status, request.statusLabel)}
+                      {hasNote && (
+                        <span className="text-[10px] bg-indigo-50 text-indigo-600 px-2 py-0.5 rounded border border-indigo-200 font-semibold select-none">
+                          Có ghi chú
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-gray-600 text-sm">
+                      Phòng: <strong>{request.roomNumber}</strong> — Người thuê:{" "}
+                      {request.tenantName}
+                    </p>
+                  </div>
+                  <span className="text-xs text-gray-400 whitespace-nowrap self-start sm:self-center bg-gray-50 px-2.5 py-1 rounded-md border border-gray-100">
+                    {request.createdAt
+                      ? new Date(request.createdAt).toLocaleString("vi-VN")
+                      : "---"}
+                  </span>
+                </div>
+
+                <div className="mb-4 bg-gray-50/50 p-3 rounded-lg border border-gray-100">
+                  <div className="flex items-start gap-2">
+                    <AlertCircle className="w-4 h-4 text-orange-500 shrink-0 mt-0.5" />
+                    <div>
+                      <p className="font-medium text-sm text-gray-900">
+                        {request.title}
+                      </p>
+                      <p className="text-xs text-gray-600 mt-1 leading-relaxed line-clamp-2">
+                        {request.description}
+                      </p>
+                    </div>
                   </div>
                 </div>
-              </div>
 
-              <div className="flex gap-2">
-                <button
-                  onClick={() => setSelectedRequest(request)}
-                  className="flex-1 px-3 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 text-xs font-medium transition-colors"
-                >
-                  Xem chi tiết
-                </button>
-                {request.status === 0 && (
+                <div className="flex gap-2">
                   <button
-                    onClick={() => handleStartProcess(request.id)}
-                    className="flex-1 px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-xs font-medium transition-colors"
+                    onClick={() => setSelectedRequest(request)}
+                    className="flex-1 px-3 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 text-xs font-medium transition-colors"
                   >
-                    Bắt đầu xử lý
+                    Xem chi tiết
                   </button>
-                )}
-                {request.status === 1 && (
-                  <button
-                    onClick={() => handleCompleteProcess(request.id)}
-                    className="flex-1 px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 text-xs font-medium transition-colors"
-                  >
-                    Hoàn thành
-                  </button>
-                )}
+                  {request.status === 0 && (
+                    <button
+                      onClick={() => handleStartProcess(request.id)}
+                      className="flex-1 px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-xs font-medium transition-colors"
+                    >
+                      Bắt đầu xử lý
+                    </button>
+                  )}
+                  {request.status === 1 && (
+                    <button
+                      onClick={() => handleCompleteProcess(request.id)}
+                      className="flex-1 px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 text-xs font-medium transition-colors"
+                    >
+                      Hoàn thành
+                    </button>
+                  )}
+                </div>
               </div>
-            </div>
-          ))
+            );
+          })
         )}
       </div>
 
@@ -371,14 +493,18 @@ export default function MaintenanceRequests() {
       {!isLoading && totalItems > 0 && (
         <div className="flex flex-col sm:flex-row items-center justify-between pt-4 border-t border-gray-200 gap-4 bg-white px-4 py-3 rounded-xl shadow-sm border">
           <p className="text-xs text-gray-500">
-            Hiển thị <span className="font-medium">{indexOfFirstItem + 1}</span> -{' '}
-            <span className="font-medium">{Math.min(indexOfLastItem, totalItems)}</span> trên tổng số{' '}
-            <span className="font-medium">{totalItems}</span> yêu cầu
+            Hiển thị <span className="font-medium">{indexOfFirstItem + 1}</span>{" "}
+            -{" "}
+            <span className="font-medium">
+              {Math.min(indexOfLastItem, totalItems)}
+            </span>{" "}
+            trên tổng số <span className="font-medium">{totalItems}</span> yêu
+            cầu
           </p>
-          
+
           <div className="flex items-center gap-2">
             <button
-              onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+              onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
               disabled={currentPage === 1}
               className="p-2 border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-40 disabled:hover:bg-white disabled:cursor-not-allowed transition-all"
             >
@@ -386,23 +512,27 @@ export default function MaintenanceRequests() {
             </button>
 
             <div className="flex items-center gap-1">
-              {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
-                <button
-                  key={page}
-                  onClick={() => setCurrentPage(page)}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
-                    currentPage === page
-                      ? 'bg-blue-600 text-white shadow-sm font-semibold'
-                      : 'border border-gray-300 hover:bg-gray-50 text-gray-700'
-                  }`}
-                >
-                  {page}
-                </button>
-              ))}
+              {Array.from({ length: totalPages }, (_, i) => i + 1).map(
+                (page) => (
+                  <button
+                    key={page}
+                    onClick={() => setCurrentPage(page)}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                      currentPage === page
+                        ? "bg-blue-600 text-white shadow-sm font-semibold"
+                        : "border border-gray-300 hover:bg-gray-50 text-gray-700"
+                    }`}
+                  >
+                    {page}
+                  </button>
+                ),
+              )}
             </div>
 
             <button
-              onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+              onClick={() =>
+                setCurrentPage((prev) => Math.min(prev + 1, totalPages))
+              }
               disabled={currentPage === totalPages}
               className="p-2 border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-40 disabled:hover:bg-white disabled:cursor-not-allowed transition-all"
             >
@@ -413,7 +543,10 @@ export default function MaintenanceRequests() {
       )}
 
       {/* Modal Chi tiết yêu cầu */}
-      <Dialog.Root open={selectedRequest !== null} onOpenChange={(open) => !open && setSelectedRequest(null)}>
+      <Dialog.Root
+        open={selectedRequest !== null}
+        onOpenChange={(open) => !open && setSelectedRequest(null)}
+      >
         <Dialog.Portal>
           <Dialog.Overlay className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 animate-fade-in" />
           <Dialog.Content className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-white rounded-xl p-6 w-full max-w-2xl max-h-[90vh] overflow-auto z-50 shadow-xl border border-gray-100">
@@ -426,51 +559,91 @@ export default function MaintenanceRequests() {
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-gray-50 p-4 rounded-xl border border-gray-100">
                     <div>
                       <p className="text-xs text-gray-500 mb-0.5">Mã yêu cầu</p>
-                      <p className="font-semibold text-gray-900">{selectedRequest.requestNumber || selectedRequest.id}</p>
+                      <p className="font-semibold text-gray-900">
+                        {selectedRequest.requestNumber || selectedRequest.id}
+                      </p>
                     </div>
                     <div>
-                      <p className="text-xs text-gray-500 mb-0.5">Trạng thái hiện tại</p>
-                      <div className="mt-0.5 w-fit">{getStatusBadge(selectedRequest.status, selectedRequest.statusLabel)}</div>
+                      <p className="text-xs text-gray-500 mb-0.5">
+                        Trạng thái hiện tại
+                      </p>
+                      <div className="mt-0.5 w-fit">
+                        {getStatusBadge(
+                          selectedRequest.status,
+                          selectedRequest.statusLabel,
+                        )}
+                      </div>
                     </div>
                     <div>
                       <p className="text-xs text-gray-500 mb-0.5">Số phòng</p>
-                      <p className="font-semibold text-gray-900">{selectedRequest.roomNumber}</p>
+                      <p className="font-semibold text-gray-900">
+                        {selectedRequest.roomNumber}
+                      </p>
                     </div>
                     <div>
-                      <p className="text-xs text-gray-500 mb-0.5">Khách báo sự cố</p>
-                      <p className="font-semibold text-gray-900">{selectedRequest.tenantName}</p>
+                      <p className="text-xs text-gray-500 mb-0.5">
+                        Khách báo sự cố
+                      </p>
+                      <p className="font-semibold text-gray-900">
+                        {selectedRequest.tenantName}
+                      </p>
                     </div>
                     <div>
-                      <p className="text-xs text-gray-500 mb-0.5">Mức độ ưu tiên</p>
-                      <div className="mt-0.5 w-fit">{getPriorityBadge(selectedRequest.priority, selectedRequest.priorityLabel)}</div>
+                      <p className="text-xs text-gray-500 mb-0.5">
+                        Mức độ ưu tiên
+                      </p>
+                      <div className="mt-0.5 w-fit">
+                        {getPriorityBadge(
+                          selectedRequest.priority,
+                          selectedRequest.priorityLabel,
+                        )}
+                      </div>
                     </div>
                     <div>
-                      <p className="text-xs text-gray-500 mb-0.5">Thời gian tiếp nhận</p>
-                      <p className="font-medium text-gray-800">{new Date(selectedRequest.createdAt).toLocaleString('vi-VN')}</p>
+                      <p className="text-xs text-gray-500 mb-0.5">
+                        Thời gian tiếp nhận
+                      </p>
+                      <p className="font-medium text-gray-800">
+                        {new Date(selectedRequest.createdAt).toLocaleString(
+                          "vi-VN",
+                        )}
+                      </p>
                     </div>
                   </div>
 
                   <div className="pt-2">
                     <p className="text-xs text-gray-500 mb-1">Tiêu đề sự cố</p>
-                    <p className="font-semibold text-gray-900 text-base">{selectedRequest.title}</p>
+                    <p className="font-semibold text-gray-900 text-base">
+                      {selectedRequest.title}
+                    </p>
                   </div>
 
                   <div>
-                    <p className="text-xs text-gray-500 mb-1">Nội dung mô tả sự cố từ khách thuê</p>
-                    <p className="text-gray-700 bg-gray-50/50 p-3 rounded-lg border border-gray-200 leading-relaxed whitespace-pre-wrap">{selectedRequest.description}</p>
+                    <p className="text-xs text-gray-500 mb-1">
+                      Nội dung mô tả sự cố từ khách thuê
+                    </p>
+                    <p className="text-gray-700 bg-gray-50/50 p-3 rounded-lg border border-gray-200 leading-relaxed whitespace-pre-wrap">
+                      {selectedRequest.description}
+                    </p>
                   </div>
 
                   <div className="pt-2">
-                    <p className="text-xs text-gray-500 mb-2">Hình ảnh đính kèm</p>
-                    {selectedRequest.images && selectedRequest.images.length > 0 ? (
+                    <p className="text-xs text-gray-500 mb-2">
+                      Hình ảnh đính kèm
+                    </p>
+                    {selectedRequest.images &&
+                    selectedRequest.images.length > 0 ? (
                       <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                         {selectedRequest.images.map((imgUrl, idx) => (
-                          <div key={idx} className="relative aspect-video rounded-lg overflow-hidden border border-gray-200 bg-gray-50">
+                          <div
+                            key={idx}
+                            className="relative aspect-video rounded-lg overflow-hidden border border-gray-200 bg-gray-50"
+                          >
                             <img
                               src={imgUrl}
                               alt={`Ảnh đính kèm ${idx + 1}`}
                               className="w-full h-full object-cover cursor-zoom-in hover:scale-105 transition-transform duration-200"
-                              onClick={() => window.open(imgUrl, '_blank')}
+                              onClick={() => window.open(imgUrl, "_blank")}
                             />
                           </div>
                         ))}
@@ -484,7 +657,9 @@ export default function MaintenanceRequests() {
 
                   {/* Ghi chú của Chủ nhà */}
                   <div className="pt-3 border-t border-gray-100">
-                    <p className="text-xs text-gray-500 mb-1.5 font-semibold uppercase tracking-wider">Ghi chú của chủ nhà</p>
+                    <p className="text-xs text-gray-500 mb-1.5 font-semibold uppercase tracking-wider">
+                      Ghi chú của chủ nhà
+                    </p>
                     <textarea
                       value={adminNote}
                       onChange={(e) => setAdminNote(e.target.value)}
@@ -495,9 +670,13 @@ export default function MaintenanceRequests() {
                     <div className="flex justify-end mt-2">
                       <button
                         onClick={handleSaveNote}
-                        className="px-4 py-1.5 bg-blue-50 text-blue-600 hover:bg-blue-100 text-xs font-semibold rounded-lg transition-colors border border-blue-200"
+                        disabled={isSavingNote}
+                        className="px-4 py-1.5 bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50 text-xs font-semibold rounded-lg transition-colors flex items-center gap-1.5 shadow-sm"
                       >
-                        Lưu ghi chú
+                        {isSavingNote && (
+                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        )}
+                        {isSavingNote ? "Đang lưu..." : "Lưu ghi chú"}
                       </button>
                     </div>
                   </div>
@@ -516,7 +695,9 @@ export default function MaintenanceRequests() {
                     )}
                     {selectedRequest.status === 1 && (
                       <button
-                        onClick={() => handleCompleteProcess(selectedRequest.id)}
+                        onClick={() =>
+                          handleCompleteProcess(selectedRequest.id)
+                        }
                         className="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 text-xs font-medium transition-colors"
                       >
                         Hoàn thành nhiệm vụ
