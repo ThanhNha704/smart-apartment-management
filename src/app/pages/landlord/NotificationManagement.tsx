@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   Bell,
   BellRing,
@@ -12,10 +12,10 @@ import {
   X,
   Volume2,
   Inbox,
-  MessageSquare
-} from 'lucide-react';
-import { toast } from 'sonner';
-import { fetchApi } from '../../api/fetchApi';
+  MessageSquare,
+} from "lucide-react";
+import { toast } from "sonner";
+import { fetchApi } from "../../api/fetchApi";
 
 // INTERFACES
 interface NotificationItem {
@@ -32,6 +32,11 @@ interface NotificationItem {
   meta?: Record<string, string>;
 }
 
+// Helper phát event để đồng bộ chuông thông báo ở Sidebar / Header
+export const triggerNotificationUpdate = () => {
+  window.dispatchEvent(new Event("notification-updated"));
+};
+
 export default function NotificationManagement() {
   const navigate = useNavigate();
   const [users, setUsers] = useState<{ id: string; name: string }[]>([]);
@@ -41,20 +46,20 @@ export default function NotificationManagement() {
   const [page, setPage] = useState(1);
   const [pageSize] = useState(20);
   const [isReadFilter, setIsReadFilter] = useState<boolean | null>(null); // null: Tất cả, true: Đã đọc, false: Chưa đọc
-  const [searchQuery, setSearchQuery] = useState('');
+  const [searchQuery, setSearchQuery] = useState("");
 
   // Thống kê số lượng thông báo
   const [stats, setStats] = useState({ total: 0, unread: 0, read: 0 });
 
   // Form Gửi Thông báo
   const [isFormOpen, setIsFormOpen] = useState(false);
-  const [tenantId, setTenantId] = useState('');
-  const [title, setTitle] = useState('');
-  const [body, setBody] = useState('');
+  const [tenantId, setTenantId] = useState("");
+  const [title, setTitle] = useState("");
+  const [body, setBody] = useState("");
   const [type, setType] = useState<number>(0);
-  const [refModel, setRefModel] = useState('');
-  const [metaKey, setMetaKey] = useState('');
-  const [metaValue, setMetaValue] = useState('');
+  const [refModel, setRefModel] = useState("");
+  const [metaKey, setMetaKey] = useState("");
+  const [metaValue, setMetaValue] = useState("");
 
   // Loading states
   const [isLoading, setIsLoading] = useState(false);
@@ -82,19 +87,24 @@ export default function NotificationManagement() {
         }
         setNotifications(items);
 
-        // Tính toán nhanh số liệu thống kê
-        const unreadCount = items.filter(n => !n.isReadAdmin).length;
+        // Tính toán số liệu thống kê
+        const unreadCount = items.filter((n) => !n.isReadAdmin).length;
         setStats({
           total: items.length,
           unread: unreadCount,
-          read: items.length - unreadCount
+          read: items.length - unreadCount,
         });
+
+        // Báo cho Sidebar cập nhật lại badge nếu đang ở tab xem tất cả
+        if (isReadFilter === null) {
+          triggerNotificationUpdate();
+        }
       } else {
-        toast.error('Không thể tải danh sách thông báo!');
+        toast.error("Không thể tải danh sách thông báo!");
       }
     } catch (error) {
       console.error(error);
-      toast.error('Lỗi kết nối khi tải thông báo!');
+      toast.error("Lỗi kết nối khi tải thông báo!");
     } finally {
       setIsLoading(false);
     }
@@ -107,13 +117,13 @@ export default function NotificationManagement() {
   useEffect(() => {
     const fetchUsers = async () => {
       try {
-        const res = await fetchApi('/Users');
+        const res = await fetchApi("/Users");
         if (res.ok) {
           const data = await res.json();
           setUsers(data);
         }
       } catch (error) {
-        console.error('Không thể tải danh sách người dùng:', error);
+        console.error("Không thể tải danh sách người dùng:", error);
       }
     };
     fetchUsers();
@@ -127,7 +137,6 @@ export default function NotificationManagement() {
     try {
       setIsSending(true);
 
-      // Khởi tạo meta object
       const metaObj: Record<string, string> = {};
       if (metaKey.trim() && metaValue.trim()) {
         metaObj[metaKey.trim()] = metaValue.trim();
@@ -140,35 +149,34 @@ export default function NotificationManagement() {
         type: type,
         refId: null,
         refModel: refModel.trim() || null,
-        meta: metaObj
+        meta: metaObj,
       };
 
-      const response = await fetchApi('/Notification', {
-        method: 'POST',
+      const response = await fetchApi("/Notification", {
+        method: "POST",
         body: JSON.stringify(payload),
       });
 
       if (response.ok) {
-        toast.success('Gửi thông báo thành công!');
-        // Reset form
-        setTenantId('');
-        setTitle('');
-        setBody('');
+        toast.success("Gửi thông báo thành công!");
+        setTenantId("");
+        setTitle("");
+        setBody("");
         setType(0);
-        setRefModel('');
-        setMetaKey('');
-        setMetaValue('');
+        setRefModel("");
+        setMetaKey("");
+        setMetaValue("");
         setIsFormOpen(false);
 
-        // Tải lại danh sách
         setPage(1);
         fetchNotifications();
+        triggerNotificationUpdate();
       } else {
-        toast.error('Gửi thông báo thất bại!');
+        toast.error("Gửi thông báo thất bại!");
       }
     } catch (error) {
       console.error(error);
-      toast.error('Lỗi hệ thống khi gửi thông báo!');
+      toast.error("Lỗi hệ thống khi gửi thông báo!");
     } finally {
       setIsSending(false);
     }
@@ -178,14 +186,27 @@ export default function NotificationManagement() {
   const handleMarkAsRead = async (id: string, silent = false) => {
     try {
       const response = await fetchApi(`/Notification/mark-read/${id}`, {
-        method: 'PUT',
+        method: "PUT",
       });
 
       if (response.ok) {
         setNotifications((prev) =>
-          prev.map((notif) => (notif.id === id ? { ...notif, isReadAdmin: true } : notif))
+          prev.map((notif) =>
+            notif.id === id ? { ...notif, isReadAdmin: true } : notif,
+          ),
         );
-        if (!silent) toast.success('Đã đánh dấu đã đọc!');
+
+        // Cập nhật card thống kê trên trang
+        setStats((prev) => ({
+          ...prev,
+          unread: Math.max(0, prev.unread - 1),
+          read: prev.read + 1,
+        }));
+
+        // Báo cho Sidebar giảm số lượng
+        triggerNotificationUpdate();
+
+        if (!silent) toast.success("Đã đánh dấu đã đọc!");
       }
     } catch (error) {
       console.error(error);
@@ -194,55 +215,71 @@ export default function NotificationManagement() {
 
   // PUT: Đánh dấu đã đọc all
   const handleMarkAllAsRead = async () => {
-    const unreadList = notifications.filter(n => !n.isReadAdmin);
+    const unreadList = notifications.filter((n) => !n.isReadAdmin);
     if (unreadList.length === 0) {
-      toast.info('Tất cả thông báo đã được đọc!');
+      toast.info("Tất cả thông báo đã được đọc!");
       return;
     }
 
     try {
-      // Đánh dấu đọc từng cái qua API đồng bộ với backend
       await Promise.all(
-        unreadList.map(n =>
+        unreadList.map((n) =>
           fetchApi(`/Notification/mark-read/${n.id}`, {
-            method: 'PUT',
-          })
-        )
+            method: "PUT",
+          }),
+        ),
       );
 
-      setNotifications((prev) => prev.map((notif) => ({ ...notif, isReadAdmin: true })));
-      toast.success('Đã đọc toàn bộ thông báo!');
+      setNotifications((prev) =>
+        prev.map((notif) => ({ ...notif, isReadAdmin: true })),
+      );
+
+      // Cập nhật card thống kê
+      setStats((prev) => ({
+        ...prev,
+        unread: 0,
+        read: prev.total,
+      }));
+
+      // Báo cho Sidebar đặt badge về 0
+      triggerNotificationUpdate();
+
+      toast.success("Đã đọc toàn bộ thông báo!");
     } catch (error) {
       console.error(error);
-      toast.error('Lỗi khi đồng bộ đánh dấu đọc tất cả!');
+      toast.error("Lỗi khi đồng bộ đánh dấu đọc tất cả!");
     }
   };
 
   // Xử lý chuyển trang hướng động khi click vào card thông báo
   const handleNotificationClick = async (notif: NotificationItem) => {
-    // Đọc ngầm nếu chưa đọc
     if (!notif.isReadAdmin) {
       await handleMarkAsRead(notif.id, true);
     }
 
     const model = notif.refModel?.toLowerCase();
     if (model) {
-      if (model === 'message') {
-        localStorage.setItem("active_chat_user_id", notif.tenantId || '');
-        navigate('/messages');
+      if (model === "message") {
+        localStorage.setItem("active_chat_user_id", notif.tenantId || "");
+        navigate("/messages");
         return;
       }
 
       const routeMap: Record<string, string> = {
-        invoice: '/invoices',
-        contract: '/contracts',
-        maintenancerequest: '/maintenance',
-        meterreading: '/meter-reading'
+        invoice: "/invoices",
+        bill: "/invoices",
+        contract: "/contracts",
+        maintenancerequest: "/maintenance",
+        issue: "/maintenance",
+        meterreading: "/meter-reading",
       };
 
       if (routeMap[model]) {
         if (notif.refId) {
-          localStorage.setItem(`detail_${model === 'maintenancerequest' ? 'maintenance' : model}_id`, notif.refId);
+          localStorage.setItem(
+            `detail_${model === "maintenancerequest" ? "maintenance" : model}_id`,
+            notif.refId,
+          );
         }
         navigate(routeMap[model]);
       } else {
@@ -254,19 +291,23 @@ export default function NotificationManagement() {
   };
 
   // Filter tìm kiếm
-  const filteredNotifications = notifications.filter(n =>
-    n.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    n.body.toLowerCase().includes(searchQuery.toLowerCase())
+  const filteredNotifications = notifications.filter(
+    (n) =>
+      n.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      n.body.toLowerCase().includes(searchQuery.toLowerCase()),
   );
 
   return (
     <div className="p-6 max-w-7xl mx-auto space-y-6">
-
       {/* HEADER SECTION */}
       <div className="flex justify-between items-start">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900 mb-1">Thông báo hệ thống</h1>
-          <p className="text-sm text-gray-500">Quản lý và phát đi thông báo trực tiếp tới các cư dân, người dùng</p>
+          <h1 className="text-2xl font-bold text-gray-900 mb-1">
+            Thông báo hệ thống
+          </h1>
+          <p className="text-sm text-gray-500">
+            Quản lý và phát đi thông báo trực tiếp tới các cư dân, người dùng
+          </p>
         </div>
         <button
           onClick={() => setIsFormOpen(true)}
@@ -285,7 +326,9 @@ export default function NotificationManagement() {
         </div>
         <div className="bg-yellow-50/50 p-5 rounded-xl border border-yellow-100 shadow-sm">
           <p className="text-sm text-yellow-700 font-medium">Chưa đọc</p>
-          <p className="text-3xl font-bold text-yellow-600 mt-2">{stats.unread}</p>
+          <p className="text-3xl font-bold text-yellow-600 mt-2">
+            {stats.unread}
+          </p>
         </div>
         <div className="bg-green-50/50 p-5 rounded-xl border border-green-100 shadow-sm">
           <p className="text-sm text-green-700 font-medium">Đã đọc</p>
@@ -294,7 +337,7 @@ export default function NotificationManagement() {
         <div className="bg-blue-50/50 p-5 rounded-xl border border-blue-100 shadow-sm flex flex-col justify-center">
           <button
             onClick={handleMarkAllAsRead}
-            disabled={notifications.length === 0}
+            disabled={notifications.length === 0 || stats.unread === 0}
             className="w-full py-2 bg-white hover:bg-blue-50 border border-blue-200 text-blue-600 font-medium rounded-lg text-sm transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
           >
             <CheckCheck className="w-4 h-4" />
@@ -317,10 +360,10 @@ export default function NotificationManagement() {
         </div>
         <div className="flex gap-2 w-full md:w-auto">
           <select
-            value={isReadFilter === null ? 'all' : isReadFilter.toString()}
+            value={isReadFilter === null ? "all" : isReadFilter.toString()}
             onChange={(e) => {
               const val = e.target.value;
-              setIsReadFilter(val === 'all' ? null : val === 'true');
+              setIsReadFilter(val === "all" ? null : val === "true");
               setPage(1);
             }}
             className="w-full md:w-auto px-4 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none bg-white cursor-pointer"
@@ -348,17 +391,24 @@ export default function NotificationManagement() {
           filteredNotifications.map((notif) => (
             <div
               key={notif.id}
-              onClick={() => handleNotificationClick(notif)} // Click vào thẻ để kích hoạt chuyển hướng
-              className={`bg-white p-5 rounded-xl border transition-all hover:shadow-md cursor-pointer flex flex-col md:flex-row justify-between items-start md:items-center gap-4 ${!notif.isReadAdmin ? 'border-l-4 border-l-blue-500 border-gray-200' : 'border-gray-100'
-                }`}
+              onClick={() => handleNotificationClick(notif)}
+              className={`bg-white p-5 rounded-xl border transition-all hover:shadow-md cursor-pointer flex flex-col md:flex-row justify-between items-start md:items-center gap-4 ${
+                !notif.isReadAdmin
+                  ? "border-l-4 border-l-blue-500 border-gray-200"
+                  : "border-gray-100"
+              }`}
             >
-              {/* Thẻ bên trái chứa nội dung chính */}
               <div className="flex items-start gap-4 flex-1">
-                <div className={`p-2.5 rounded-lg ${notif.refModel?.toLowerCase() === 'message'
-                    ? 'bg-purple-50 text-purple-600' // Đổi sang màu tím nếu là tin nhắn
-                    : !notif.isReadAdmin ? 'bg-blue-50 text-blue-600' : 'bg-gray-100 text-gray-400'
-                  }`}>
-                  {notif.refModel?.toLowerCase() === 'message' ? (
+                <div
+                  className={`p-2.5 rounded-lg ${
+                    notif.refModel?.toLowerCase() === "message"
+                      ? "bg-purple-50 text-purple-600"
+                      : !notif.isReadAdmin
+                        ? "bg-blue-50 text-blue-600"
+                        : "bg-gray-100 text-gray-400"
+                  }`}
+                >
+                  {notif.refModel?.toLowerCase() === "message" ? (
                     <MessageSquare className="w-5 h-5" />
                   ) : (
                     <Bell className="w-5 h-5" />
@@ -366,45 +416,71 @@ export default function NotificationManagement() {
                 </div>
                 <div>
                   <div className="flex items-center gap-2 mb-1.5 flex-wrap">
-                    <span className="text-xs font-semibold text-gray-400">#{notif.id.substring(0, 8).toUpperCase()}</span>
-
-                    {/* Loại thông báo */}
-                    <span className={`text-[10px] px-2.5 py-0.5 rounded-full font-medium ${notif.type === 0 ? 'bg-gray-100 text-gray-600' :
-                        notif.type === 1 ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'
-                      }`}>
-                      {notif.type === 0 ? 'Hệ thống' : notif.type === 1 ? 'Hóa đơn' : 'Sự cố'}
+                    <span className="text-xs font-semibold text-gray-400">
+                      #{notif.id.substring(0, 8).toUpperCase()}
                     </span>
 
-                    {/* Trạng thái Đã đọc / Chưa đọc */}
-                    <span className={`text-[10px] px-2.5 py-0.5 rounded-full font-medium ${notif.isReadAdmin ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'
-                      }`}>
-                      {notif.isReadAdmin ? 'Đã đọc' : 'Chưa đọc'}
+                    <span
+                      className={`text-[10px] px-2.5 py-0.5 rounded-full font-medium ${
+                        notif.type === 0
+                          ? "bg-gray-100 text-gray-600"
+                          : notif.type === 1
+                            ? "bg-emerald-100 text-emerald-700"
+                            : "bg-rose-100 text-rose-700"
+                      }`}
+                    >
+                      {notif.type === 0
+                        ? "Hệ thống"
+                        : notif.type === 1
+                          ? "Hóa đơn"
+                          : "Sự cố"}
+                    </span>
+
+                    <span
+                      className={`text-[10px] px-2.5 py-0.5 rounded-full font-medium ${
+                        notif.isReadAdmin
+                          ? "bg-green-100 text-green-700"
+                          : "bg-amber-100 text-amber-700"
+                      }`}
+                    >
+                      {notif.isReadAdmin ? "Đã đọc" : "Chưa đọc"}
                     </span>
 
                     <span className="text-xs text-gray-400">
-                      • {new Date(notif.createdAt).toLocaleString('vi-VN')}
+                      • {new Date(notif.createdAt).toLocaleString("vi-VN")}
                     </span>
                   </div>
 
-                  <h3 className={`text-base flex items-center gap-2 ${!notif.isReadAdmin ? 'font-bold text-gray-900' : 'font-semibold text-gray-700'}`}>
+                  <h3
+                    className={`text-base flex items-center gap-2 ${
+                      !notif.isReadAdmin
+                        ? "font-bold text-gray-900"
+                        : "font-semibold text-gray-700"
+                    }`}
+                  >
                     {notif.title}
-                    {notif.refModel?.toLowerCase() === 'message' && (
-                      <span className="text-[10px] bg-purple-100 text-purple-700 font-bold px-1.5 py-0.5 rounded">Tin nhắn mới</span>
+                    {notif.refModel?.toLowerCase() === "message" && (
+                      <span className="text-[10px] bg-purple-100 text-purple-700 font-bold px-1.5 py-0.5 rounded">
+                        Tin nhắn mới
+                      </span>
                     )}
                   </h3>
-                  <p className="text-sm text-gray-500 mt-1 leading-relaxed">{notif.body}</p>
+                  <p className="text-sm text-gray-500 mt-1 leading-relaxed">
+                    {notif.body}
+                  </p>
 
-                  {/* Ref model link hiển thị thông báo chuyển hướng */}
                   {notif.refModel && (
                     <div className="mt-2.5 flex items-center gap-1.5 text-xs text-blue-600 bg-blue-50 w-fit px-2.5 py-1 rounded-md border border-blue-100">
                       <Volume2 className="w-3.5 h-3.5" />
-                      Nhấp để đi tới: <span className="font-semibold uppercase">{notif.refModel}</span>
+                      Nhấp để đi tới:{" "}
+                      <span className="font-semibold uppercase">
+                        {notif.refModel}
+                      </span>
                     </div>
                   )}
                 </div>
               </div>
 
-              {/* Nhóm hành động bên phải */}
               <div
                 className="flex items-center gap-2 w-full md:w-auto border-t md:border-t-0 pt-3 md:pt-0 justify-end"
                 onClick={(e) => e.stopPropagation()}
@@ -472,7 +548,9 @@ export default function NotificationManagement() {
                 >
                   <option value="">Gửi cho tất cả mọi người</option>
                   {users.map((u) => (
-                    <option key={u.id} value={u.id}>{u.name}</option>
+                    <option key={u.id} value={u.id}>
+                      {u.name}
+                    </option>
                   ))}
                 </select>
               </div>
@@ -505,10 +583,11 @@ export default function NotificationManagement() {
                 />
               </div>
 
-              {/* KHU VỰC THAY ĐỔI: Bỏ ID tham chiếu, chỉ giữ lại Phân loại & Select liên kết tính năng */}
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-semibold text-gray-700 uppercase tracking-wider mb-1.5">Phân loại</label>
+                  <label className="block text-xs font-semibold text-gray-700 uppercase tracking-wider mb-1.5">
+                    Phân loại
+                  </label>
                   <select
                     value={type}
                     onChange={(e) => setType(Number(e.target.value))}
@@ -521,7 +600,9 @@ export default function NotificationManagement() {
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold text-gray-700 uppercase tracking-wider mb-1.5">Liên kết tính năng</label>
+                  <label className="block text-xs font-semibold text-gray-700 uppercase tracking-wider mb-1.5">
+                    Liên kết tính năng
+                  </label>
                   <select
                     value={refModel}
                     onChange={(e) => setRefModel(e.target.value)}
@@ -537,9 +618,10 @@ export default function NotificationManagement() {
                 </div>
               </div>
 
-              {/* Metadata section (Giữ nguyên cấu trúc Metadata để backup khi cần truyền Key/Value) */}
               <div>
-                <label className="block text-xs font-semibold text-gray-700 uppercase tracking-wider mb-1.5">Metadata Key/Val (Tùy chọn)</label>
+                <label className="block text-xs font-semibold text-gray-700 uppercase tracking-wider mb-1.5">
+                  Metadata Key/Val (Tùy chọn)
+                </label>
                 <div className="flex gap-1.5">
                   <input
                     type="text"
