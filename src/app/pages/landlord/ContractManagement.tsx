@@ -476,19 +476,12 @@ export default function ContractManagement() {
             <form className="space-y-4" onSubmit={handleCreateContract}>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <label className="block font-medium mb-1 text-gray-700">Mã số hợp đồng <span className="text-red-500">*</span></label>
-                  <input type="text" value={createFormData.contractNumber} onChange={(e) => setCreateFormData({ ...createFormData, contractNumber: e.target.value })} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-black" required />
-                </div>
-                <div>
                   <label className="block font-medium mb-1 text-gray-700">Lựa chọn người thuê <span className="text-red-500">*</span></label>
                   <select value={selectedTenantId} onChange={(e) => setSelectedTenantId(e.target.value)} className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-white" required>
                     <option value="">-- Chọn khách thuê --</option>
                     {tenants.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
                   </select>
                 </div>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="block font-medium mb-1 text-gray-700">Số phòng liên kết <span className="text-red-500">*</span></label>
                   <select value={selectedRoomId} onChange={(e) => {
@@ -499,6 +492,13 @@ export default function ContractManagement() {
                     <option value="">-- Chọn số phòng --</option>
                     {rooms.map(r => <option key={r.id} value={r.id}>Phòng {r.roomNumber} ({r.status === 0 ? 'Trống' : 'Đang thuê'})</option>)}
                   </select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block font-medium mb-1 text-gray-700">Giá phòng hàng tháng (₫) <span className="text-red-500">*</span></label>
+                  <input type="number" value={createFormData.price || ''} onChange={(e) => setCreateFormData({ ...createFormData, price: Number(e.target.value) })} className="w-full px-3 py-2 border border-gray-300 rounded-lg font-medium" required />
                 </div>
                 <div>
                   <label className="block font-medium mb-1 text-gray-700">Ngày thu tiền định kỳ <span className="text-red-500">*</span></label>
@@ -515,11 +515,6 @@ export default function ContractManagement() {
                   <label className="block font-medium mb-1 text-gray-700">Ngày hết hạn hợp đồng <span className="text-red-500">*</span></label>
                   <input type="date" value={createFormData.endDate} onChange={(e) => setCreateFormData({ ...createFormData, endDate: e.target.value })} className="w-full px-3 py-2 border border-gray-300 rounded-lg" required />
                 </div>
-              </div>
-
-              <div>
-                <label className="block font-medium mb-1 text-gray-700">Giá phòng hàng tháng (₫) <span className="text-red-500">*</span></label>
-                <input type="number" value={createFormData.price || ''} onChange={(e) => setCreateFormData({ ...createFormData, price: Number(e.target.value) })} className="w-full px-3 py-2 border border-gray-300 rounded-lg font-medium" required />
               </div>
 
               <div className="flex gap-2 pt-4 border-t">

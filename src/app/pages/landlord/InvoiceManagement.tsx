@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
-import { Search, Eye, QrCode, CheckCircle, Clock, XCircle, Trash2, Loader2, ChevronLeft, ChevronRight, ArrowUpDown } from 'lucide-react';
+import { Search, Eye, QrCode, CheckCircle, Clock, XCircle, Trash2, Loader2, ChevronLeft, ChevronRight, ArrowUpDown, AlertCircle, Check, RotateCcw, X } from 'lucide-react';
 import * as Dialog from '@radix-ui/react-dialog';
 import { toast } from 'sonner';
-import { fetchApi } from '../../api/fetchApi';
+import { fetchApi, API_BASE_URL } from '../../api/fetchApi';
 
 // Interface
 interface Invoice {
@@ -12,7 +12,7 @@ interface Invoice {
   tenantName: string;
   billingPeriod: string;
   dueDate: string;
-  status: number;  // 0 = Chờ thanh toán, 1 = Đã thanh toán, 2 = Quá hạn
+  status: number;  // 0 = Đang xử lý, 1 = Đã thanh toán, 2 = Đã hủy, 3 = Chờ thanh toán, 4 = Quá hạn, 5 = Thanh toán một phần
   statusLabel: string;
   paidAmount: number;
   roomPrice: number;
@@ -25,6 +25,9 @@ interface Invoice {
   serviceFee: number;
   amount: number;
   note: string;
+  receiptImage?: string;
+  type: number; // 0 = Rent, 1 = Deposit
+  roomDeposit: number;
 }
 
 interface RoomOption { id: string; roomNumber: string; price: number; }
@@ -194,6 +197,57 @@ export default function InvoiceManagement() {
     }
   };
 
+  // Hàm PUT: Xác nhận thanh toán (theo trạng thái backend)
+  const handleConfirmPayment = async (id: string) => {
+    try {
+      const response = await fetchApi(`/Invoices/${id}/confirm-payment`, { method: 'PUT' });
+      if (response.ok) {
+        toast.success('Xác nhận thanh toán thành công!');
+        setSelectedInvoice(null);
+        loadInitialData();
+      } else {
+        const err = await response.json().catch(() => null);
+        toast.error(err?.message || 'Xác nhận thanh toán thất bại!');
+      }
+    } catch {
+      toast.error('Lỗi kết nối đến máy chủ!');
+    }
+  };
+
+  // Hàm PUT: Hủy hóa đơn
+  const handleCancelInvoice = async (id: string) => {
+    try {
+      const response = await fetchApi(`/Invoices/${id}/cancel`, { method: 'PUT' });
+      if (response.ok) {
+        toast.success('Đã hủy hóa đơn thành công!');
+        setSelectedInvoice(null);
+        loadInitialData();
+      } else {
+        const err = await response.json().catch(() => null);
+        toast.error(err?.message || 'Hủy hóa đơn thất bại!');
+      }
+    } catch {
+      toast.error('Lỗi kết nối đến máy chủ!');
+    }
+  };
+
+  // Hàm PUT: Khôi phục/Kích hoạt lại hóa đơn
+  const handleReactivateInvoice = async (id: string) => {
+    try {
+      const response = await fetchApi(`/Invoices/${id}/reactivate`, { method: 'PUT' });
+      if (response.ok) {
+        toast.success('Đã khôi phục hóa đơn thành công!');
+        setSelectedInvoice(null);
+        loadInitialData();
+      } else {
+        const err = await response.json().catch(() => null);
+        toast.error(err?.message || 'Khôi phục hóa đơn thất bại!');
+      }
+    } catch {
+      toast.error('Lỗi kết nối đến máy chủ!');
+    }
+  };
+
   // Hàm DELETE: Xóa hóa đơn
   const handleDeleteInvoice = async () => {
     if (!invoiceToDelete) return;
@@ -239,12 +293,15 @@ export default function InvoiceManagement() {
   const paginatedInvoices = filteredAndSortedInvoices.slice(startIndex, startIndex + itemsPerPage);
 
   const getStatusBadge = (status: number, label: string) => {
-    const configs = {
-      1: { icon: CheckCircle, className: 'bg-green-100 text-green-700' },
-      0: { icon: Clock, className: 'bg-yellow-100 text-yellow-700' },
-      2: { icon: XCircle, className: 'bg-red-100 text-red-700' },
+    const configs: Record<number, { icon: any, className: string }> = {
+      0: { icon: Clock, className: 'bg-blue-100 text-blue-700' },          // Pending / Đang xử lý
+      1: { icon: CheckCircle, className: 'bg-green-100 text-green-700' },   // Paid / Đã thanh toán
+      2: { icon: XCircle, className: 'bg-gray-100 text-gray-500' },         // Cancelled / Đã hủy
+      3: { icon: Clock, className: 'bg-yellow-100 text-yellow-700' },       // Unpaid / Chờ thanh toán
+      4: { icon: AlertCircle, className: 'bg-red-100 text-red-700' },        // Overdue / Quá hạn
+      5: { icon: CheckCircle, className: 'bg-purple-100 text-purple-700' }, // Partial / Thanh toán một phần
     };
-    const config = configs[status as keyof typeof configs] || { icon: Clock, className: 'bg-gray-100 text-gray-700' };
+    const config = configs[status] || { icon: Clock, className: 'bg-gray-100 text-gray-700' };
     const Icon = config.icon;
     return (
       <span className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-medium ${config.className}`}>
@@ -290,9 +347,12 @@ export default function InvoiceManagement() {
             className="px-4 py-2 border border-gray-300 rounded-lg text-sm bg-white text-gray-700"
           >
             <option value="all">Tất cả trạng thái</option>
+            <option value="0">Đang xử lý</option>
+            <option value="3">Chờ thanh toán</option>
             <option value="1">Đã thanh toán</option>
-            <option value="0">Chờ thanh toán</option>
-            <option value="2">Quá hạn</option>
+            <option value="4">Quá hạn</option>
+            <option value="2">Đã hủy</option>
+            <option value="5">Thanh toán một phần</option>
           </select>
         </div>
       </div>
@@ -338,8 +398,39 @@ export default function InvoiceManagement() {
                         <td className="px-6 py-4">
                           <div className="flex items-center justify-center gap-1">
                             <button onClick={() => setSelectedInvoice(invoice)} className="p-2 hover:bg-gray-100 text-gray-600 rounded-md" title="Xem chi tiết"><Eye className="w-4 h-4" /></button>
-                            {/* <button onClick={() => { setSelectedInvoice(invoice); setShowQRDialog(true); }} className="p-2 hover:bg-gray-100 text-gray-600 rounded-md" title="Mã QR Pay"><QrCode className="w-4 h-4" /></button> */}
-                            <button onClick={() => { setInvoiceToDelete(invoice); setIsDeleteDialogOpen(true); }} className="p-2 hover:bg-gray-100 text-red-600 rounded-md" title="Xóa bỏ"><Trash2 className="w-4 h-4" /></button>
+                            
+                            {/* Nút thao tác nhanh dựa trên trạng thái */}
+                            {[0, 3, 4].includes(invoice.status) && (
+                              <button 
+                                onClick={() => handleConfirmPayment(invoice.id)} 
+                                className="p-2 hover:bg-green-50 text-green-600 rounded-md" 
+                                title="Xác nhận thanh toán"
+                              >
+                                <Check className="w-4 h-4" />
+                              </button>
+                            )}
+
+                            {invoice.status === 0 && (
+                              <button 
+                                onClick={() => handleCancelInvoice(invoice.id)} 
+                                className="p-2 hover:bg-orange-50 text-orange-500 rounded-md" 
+                                title="Hủy hóa đơn"
+                              >
+                                <X className="w-4 h-4" />
+                              </button>
+                            )}
+
+                            {invoice.status === 2 && (
+                              <button 
+                                onClick={() => handleReactivateInvoice(invoice.id)} 
+                                className="p-2 hover:bg-blue-50 text-blue-600 rounded-md" 
+                                title="Khôi phục hóa đơn"
+                              >
+                                <RotateCcw className="w-4 h-4" />
+                              </button>
+                            )}
+
+                            <button onClick={() => { setInvoiceToDelete(invoice); setIsDeleteDialogOpen(true); }} className="p-2 hover:bg-red-50 text-red-600 rounded-md" title="Xóa bỏ"><Trash2 className="w-4 h-4" /></button>
                           </div>
                         </td>
                       </tr>
@@ -417,7 +508,11 @@ export default function InvoiceManagement() {
                   <div>
                     <h4 className="font-semibold text-gray-800 mb-2">Bảng tổng hợp chi tiết dịch vụ</h4>
                     <div className="border border-gray-300 rounded-lg p-4 space-y-2.5 bg-white">
-                      <div className="flex justify-between"><span>Tiền thuê phòng cơ bản</span><span className="font-medium">{(selectedInvoice.roomPrice || 0).toLocaleString('vi-VN')} ₫</span></div>
+                      {selectedInvoice.type === 1 ? (
+                        <div className="flex justify-between"><span>Tiền đặt cọc phòng</span><span className="font-medium">{(selectedInvoice.roomDeposit || 0).toLocaleString('vi-VN')} ₫</span></div>
+                      ) : (
+                        <div className="flex justify-between"><span>Tiền thuê phòng cơ bản</span><span className="font-medium">{(selectedInvoice.roomPrice || 0).toLocaleString('vi-VN')} ₫</span></div>
+                      )}
                       <div className="flex justify-between text-gray-600"><span>Tiền điện ({selectedInvoice.electricUsage} kWh × {selectedInvoice.electricPrice} ₫)</span><span>{selectedInvoice.electricTotal.toLocaleString('vi-VN')} ₫</span></div>
                       <div className="flex justify-between text-gray-600"><span>Tiền nước ({selectedInvoice.waterUsage} m³ × {selectedInvoice.waterPrice} ₫)</span><span>{selectedInvoice.waterTotal.toLocaleString('vi-VN')} ₫</span></div>
                       <div className="flex justify-between text-gray-600"><span>Phí quản lý dịch vụ cố định</span><span>{(selectedInvoice.serviceFee || 0).toLocaleString('vi-VN')} ₫</span></div>
@@ -426,13 +521,49 @@ export default function InvoiceManagement() {
                         <span className="text-blue-600">{(selectedInvoice.amount || 0).toLocaleString('vi-VN')} ₫</span>
                       </div>
                     </div>
+
+                    {selectedInvoice.receiptImage && (
+                      <div className="mt-4">
+                        <p className="text-gray-500 font-semibold mb-1">Minh chứng thanh toán (Tenant upload):</p>
+                        <div className="border border-gray-300 rounded-lg overflow-hidden max-h-60 flex justify-center bg-gray-50 p-2">
+                          <img 
+                            src={selectedInvoice.receiptImage.startsWith('http') ? selectedInvoice.receiptImage : `${API_BASE_URL.replace('/api', '')}/${selectedInvoice.receiptImage}`} 
+                            alt="Minh chứng thanh toán" 
+                            className="max-h-56 object-contain cursor-pointer hover:scale-[1.02] transition-transform"
+                            onClick={() => window.open(selectedInvoice.receiptImage?.startsWith('http') ? selectedInvoice.receiptImage : `${API_BASE_URL.replace('/api', '')}/${selectedInvoice.receiptImage}`, '_blank')}
+                          />
+                        </div>
+                      </div>
+                    )}
                   </div>
 
                   <div className="flex gap-2 pt-2 border-t border-gray-400">
-                    <Dialog.Close className="flex-1 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 font-medium">Đóng</Dialog.Close>
-                    {selectedInvoice.status !== 1 && (
-                      <button onClick={() => handlePayInvoice(selectedInvoice.id)} className="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg font-medium hover:bg-green-700 transition-colors">
-                        Xác nhận đã thu tiền
+                    <Dialog.Close className="flex-1 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 font-medium text-center">Đóng</Dialog.Close>
+                    
+                    {selectedInvoice.status === 0 && (
+                      <button 
+                        onClick={() => handleCancelInvoice(selectedInvoice.id)} 
+                        className="px-4 py-2 bg-orange-600 text-white rounded-lg font-medium hover:bg-orange-700 transition-colors"
+                      >
+                        Hủy hóa đơn
+                      </button>
+                    )}
+
+                    {selectedInvoice.status === 2 && (
+                      <button 
+                        onClick={() => handleReactivateInvoice(selectedInvoice.id)} 
+                        className="px-4 py-2 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition-colors"
+                      >
+                        Kích hoạt lại
+                      </button>
+                    )}
+
+                    {[0, 3, 4].includes(selectedInvoice.status) && (
+                      <button 
+                        onClick={() => handleConfirmPayment(selectedInvoice.id)} 
+                        className="px-4 py-2 bg-green-600 text-white rounded-lg font-medium hover:bg-green-700 transition-colors"
+                      >
+                        Xác nhận thanh toán
                       </button>
                     )}
                   </div>
