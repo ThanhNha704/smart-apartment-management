@@ -15,7 +15,7 @@ import {
   MessageSquare,
 } from "lucide-react";
 import { toast } from "sonner";
-import { fetchApi } from "../../api/fetchApi";
+import { fetchApi, parseApiError } from "../../api/fetchApi";
 
 // INTERFACES
 interface NotificationItem {
@@ -40,16 +40,13 @@ export const triggerNotificationUpdate = () => {
 export default function NotificationManagement() {
   const navigate = useNavigate();
   const [users, setUsers] = useState<{ id: string; name: string }[]>([]);
-  const [notifications, setNotifications] = useState<NotificationItem[]>([]);
+  const [allNotifications, setAllNotifications] = useState<NotificationItem[]>([]);
 
   // Bộ lọc & Phân trang
   const [page, setPage] = useState(1);
-  const [pageSize] = useState(20);
+  const [pageSize] = useState(5);
   const [isReadFilter, setIsReadFilter] = useState<boolean | null>(null); // null: Tất cả, true: Đã đọc, false: Chưa đọc
   const [searchQuery, setSearchQuery] = useState("");
-
-  // Thống kê số lượng thông báo
-  const [stats, setStats] = useState({ total: 0, unread: 0, read: 0 });
 
   // Form Gửi Thông báo
   const [isFormOpen, setIsFormOpen] = useState(false);
@@ -65,16 +62,32 @@ export default function NotificationManagement() {
   const [isLoading, setIsLoading] = useState(false);
   const [isSending, setIsSending] = useState(false);
 
+  // Tính toán số liệu thống kê
+  const totalCount = allNotifications.length;
+  const unreadCount = allNotifications.filter((n) => !n.isReadAdmin).length;
+  const readCount = totalCount - unreadCount;
+
+  // Lọc thông báo
+  const filteredNotifications = allNotifications.filter((notif) => {
+    const matchesRead = isReadFilter === null || notif.isReadAdmin === isReadFilter;
+    const matchesSearch =
+      searchQuery.trim() === "" ||
+      notif.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      notif.body.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (notif.refModel && notif.refModel.toLowerCase().includes(searchQuery.toLowerCase()));
+    return matchesRead && matchesSearch;
+  });
+
+  // Logic Phân trang
+  const totalPages = Math.ceil(filteredNotifications.length / pageSize) || 1;
+  const startIndex = (page - 1) * pageSize;
+  const paginatedNotifications = filteredNotifications.slice(startIndex, startIndex + pageSize);
+
   // GET: Tải danh sách thông báo
   const fetchNotifications = async () => {
     try {
       setIsLoading(true);
-      let query = `/Notification/all?page=${page}&pageSize=${pageSize}`;
-      if (isReadFilter !== null) {
-        query += `&isReadAdmin=${isReadFilter}`;
-      }
-
-      const res = await fetchApi(query);
+      const res = await fetchApi("/Notification/all");
       if (res.ok) {
         const data = await res.json();
         let items: NotificationItem[] = [];
@@ -85,20 +98,10 @@ export default function NotificationManagement() {
         } else if (data && Array.isArray(data.items)) {
           items = data.items;
         }
-        setNotifications(items);
+        setAllNotifications(items);
 
-        // Tính toán số liệu thống kê
-        const unreadCount = items.filter((n) => !n.isReadAdmin).length;
-        setStats({
-          total: items.length,
-          unread: unreadCount,
-          read: items.length - unreadCount,
-        });
-
-        // Báo cho Sidebar cập nhật lại badge nếu đang ở tab xem tất cả
-        if (isReadFilter === null) {
-          triggerNotificationUpdate();
-        }
+        // Báo cho Sidebar cập nhật lại badge
+        triggerNotificationUpdate();
       } else {
         toast.error("Không thể tải danh sách thông báo!");
       }
@@ -112,7 +115,11 @@ export default function NotificationManagement() {
 
   useEffect(() => {
     fetchNotifications();
-  }, [page, isReadFilter]);
+  }, []);
+
+  useEffect(() => {
+    setPage(1);
+  }, [searchQuery, isReadFilter]);
 
   useEffect(() => {
     const fetchUsers = async () => {
@@ -172,7 +179,8 @@ export default function NotificationManagement() {
         fetchNotifications();
         triggerNotificationUpdate();
       } else {
-        toast.error("Gửi thông báo thất bại!");
+        const errMsg = await parseApiError(response, "Gửi thông báo thất bại!");
+        toast.error(errMsg);
       }
     } catch (error) {
       console.error(error);
@@ -190,18 +198,11 @@ export default function NotificationManagement() {
       });
 
       if (response.ok) {
-        setNotifications((prev) =>
+        setAllNotifications((prev) =>
           prev.map((notif) =>
             notif.id === id ? { ...notif, isReadAdmin: true } : notif,
           ),
         );
-
-        // Cập nhật card thống kê trên trang
-        setStats((prev) => ({
-          ...prev,
-          unread: Math.max(0, prev.unread - 1),
-          read: prev.read + 1,
-        }));
 
         // Báo cho Sidebar giảm số lượng
         triggerNotificationUpdate();
@@ -215,31 +216,24 @@ export default function NotificationManagement() {
 
   // PUT: Đánh dấu đã đọc all
   const handleMarkAllAsRead = async () => {
-    const unreadList = notifications.filter((n) => !n.isReadAdmin);
+    const unreadList = allNotifications.filter((n) => !n.isReadAdmin);
     if (unreadList.length === 0) {
       toast.info("Tất cả thông báo đã được đọc!");
       return;
     }
 
     try {
-      await Promise.all(
-        unreadList.map((n) =>
-          fetchApi(`/Notification/mark-read/${n.id}`, {
-            method: "PUT",
-          }),
-        ),
-      );
+      const response = await fetchApi("/Notification/mark-all-read", {
+        method: "PUT",
+      });
 
-      setNotifications((prev) =>
+      if (!response.ok) {
+        throw new Error("Không thể đánh dấu đọc tất cả");
+      }
+
+      setAllNotifications((prev) =>
         prev.map((notif) => ({ ...notif, isReadAdmin: true })),
       );
-
-      // Cập nhật card thống kê
-      setStats((prev) => ({
-        ...prev,
-        unread: 0,
-        read: prev.total,
-      }));
 
       // Báo cho Sidebar đặt badge về 0
       triggerNotificationUpdate();
@@ -290,13 +284,6 @@ export default function NotificationManagement() {
     }
   };
 
-  // Filter tìm kiếm
-  const filteredNotifications = notifications.filter(
-    (n) =>
-      n.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      n.body.toLowerCase().includes(searchQuery.toLowerCase()),
-  );
-
   return (
     <div className="p-6 max-w-7xl mx-auto space-y-6">
       {/* HEADER SECTION */}
@@ -322,22 +309,22 @@ export default function NotificationManagement() {
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <div className="bg-white p-5 rounded-xl border border-gray-100 shadow-sm">
           <p className="text-sm text-gray-500 font-medium">Tổng thông báo</p>
-          <p className="text-3xl font-bold text-gray-900 mt-2">{stats.total}</p>
+          <p className="text-3xl font-bold text-gray-900 mt-2">{totalCount}</p>
         </div>
         <div className="bg-yellow-50/50 p-5 rounded-xl border border-yellow-100 shadow-sm">
           <p className="text-sm text-yellow-700 font-medium">Chưa đọc</p>
           <p className="text-3xl font-bold text-yellow-600 mt-2">
-            {stats.unread}
+            {unreadCount}
           </p>
         </div>
         <div className="bg-green-50/50 p-5 rounded-xl border border-green-100 shadow-sm">
           <p className="text-sm text-green-700 font-medium">Đã đọc</p>
-          <p className="text-3xl font-bold text-green-600 mt-2">{stats.read}</p>
+          <p className="text-3xl font-bold text-green-600 mt-2">{readCount}</p>
         </div>
         <div className="bg-blue-50/50 p-5 rounded-xl border border-blue-100 shadow-sm flex flex-col justify-center">
           <button
             onClick={handleMarkAllAsRead}
-            disabled={notifications.length === 0 || stats.unread === 0}
+            disabled={allNotifications.length === 0 || unreadCount === 0}
             className="w-full py-2 bg-white hover:bg-blue-50 border border-blue-200 text-blue-600 font-medium rounded-lg text-sm transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
           >
             <CheckCheck className="w-4 h-4" />
@@ -388,7 +375,7 @@ export default function NotificationManagement() {
             <p className="text-sm font-medium">Không tìm thấy thông báo nào</p>
           </div>
         ) : (
-          filteredNotifications.map((notif) => (
+          paginatedNotifications.map((notif) => (
             <div
               key={notif.id}
               onClick={() => handleNotificationClick(notif)}
@@ -509,10 +496,10 @@ export default function NotificationManagement() {
         >
           Trang trước
         </button>
-        <span className="text-sm text-gray-600 font-medium">Trang {page}</span>
+        <span className="text-sm text-gray-600 font-medium">Trang {page} / {totalPages}</span>
         <button
           onClick={() => setPage((p) => p + 1)}
-          disabled={notifications.length < pageSize}
+          disabled={page >= totalPages}
           className="px-4 py-2 border border-gray-200 rounded-lg text-sm font-medium disabled:opacity-50 hover:bg-gray-50 transition-colors"
         >
           Trang sau

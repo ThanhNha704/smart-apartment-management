@@ -16,7 +16,7 @@ import {
 } from "lucide-react";
 import * as Dialog from "@radix-ui/react-dialog";
 import { toast } from "sonner";
-import { fetchApi } from "../../api/fetchApi";
+import { fetchApi, parseApiError } from "../../api/fetchApi";
 
 // Interface
 interface UserTenant {
@@ -150,11 +150,7 @@ export default function TenantManagement() {
         setFormData(blankTenantFormData);
         fetchTenants();
       } else {
-        const errorData = await response.json().catch(() => null);
-        const errMsg =
-          errorData?.join?.(", ") ||
-          errorData?.message ||
-          "Lỗi khi tạo tài khoản!";
+        const errMsg = await parseApiError(response, "Lỗi khi tạo tài khoản!");
         toast.error(errMsg);
       }
     } catch (error) {
@@ -217,9 +213,7 @@ export default function TenantManagement() {
         setFormData(blankTenantFormData);
         fetchTenants();
       } else {
-        const errorData = await response.json().catch(() => null);
-        const errMsg =
-          errorData?.join?.(", ") || errorData?.message || "Cập nhật thất bại!";
+        const errMsg = await parseApiError(response, "Cập nhật thất bại!");
         toast.error(errMsg);
       }
     } catch (error) {
@@ -241,12 +235,13 @@ export default function TenantManagement() {
         setTenantToDelete(null);
         fetchTenants();
       } else {
-        throw new Error("Xóa thất bại");
+        const errMsg = await parseApiError(response, "Không thể xóa người dùng này!");
+        toast.error(errMsg);
       }
     } catch (error) {
       console.error(error);
       toast.error(
-        "Không thể xóa người dùng này (Có thể liên quan đến ràng buộc hợp đồng).",
+        "Lỗi kết nối đến server!",
       );
     }
   };

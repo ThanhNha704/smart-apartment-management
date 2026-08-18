@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
-import { Search, Plus, FileText, CheckCircle, Clock, XCircle, Calendar, Eye, Loader2, ArrowUpDown } from 'lucide-react';
+import { Search, Plus, FileText, CheckCircle, Clock, XCircle, Calendar, Eye, Loader2, ArrowUpDown, Download } from 'lucide-react';
 import * as Dialog from '@radix-ui/react-dialog';
 import { toast } from 'sonner';
-import { fetchApi } from '../../api/fetchApi';
+import { fetchApi, parseApiError } from '../../api/fetchApi';
 
 // INTERFACES
 interface ContractBackend {
@@ -145,6 +145,99 @@ export default function ContractManagement() {
     }
   }, [selectedTenantId, tenants, isCreateDialogOpen]);
 
+  // Xuất PDF hợp đồng (dùng window.print để hỗ trợ tiếng Việt đầy đủ)
+  const handleDownloadPDF = (contract: ContractBackend) => {
+    const today = new Date().toLocaleDateString('vi-VN');
+    const startDate = new Date(contract.startDate).toLocaleDateString('vi-VN');
+    const endDate = new Date(contract.endDate).toLocaleDateString('vi-VN');
+
+    const html = `
+      <!DOCTYPE html>
+      <html lang="vi">
+      <head>
+        <meta charset="UTF-8" />
+        <title>Hợp đồng ${contract.contractNumber}</title>
+        <style>
+          @page { size: A4; margin: 25mm 20mm; }
+          * { box-sizing: border-box; }
+          body { font-family: 'Times New Roman', Times, serif; font-size: 13pt; color: #111; line-height: 1.6; }
+          .center { text-align: center; }
+          .bold { font-weight: bold; }
+          .title { font-size: 16pt; font-weight: bold; text-transform: uppercase; margin: 10px 0 4px; }
+          .subtitle { font-size: 11pt; font-style: italic; margin-bottom: 6px; }
+          hr { border: none; border-top: 1px solid #333; margin: 10px 0 16px; }
+          .date { margin-bottom: 12px; }
+          .section-title { font-weight: bold; margin: 14px 0 4px; }
+          .line { margin: 2px 0 2px 16px; }
+          .sign-row { display: flex; justify-content: space-between; margin-top: 50px; }
+          .sign-col { text-align: center; width: 45%; }
+          .sign-col p { margin: 0; font-weight: bold; }
+          .sign-col small { font-style: italic; font-size: 11pt; color: #555; }
+          @media print {
+            body { -webkit-print-color-adjust: exact; }
+          }
+        </style>
+      </head>
+      <body>
+        <div class="center bold">CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM</div>
+        <div class="center subtitle">Độc lập - Tự do - Hạnh phúc</div>
+        <div class="center">―――――――</div>
+        <div class="center title">HỢP ĐỒNG THUÊ PHÒNG TRỌ</div>
+        <div class="center" style="margin-bottom:10px;">Mã hợp đồng: <strong>${contract.contractNumber}</strong></div>
+        <hr/>
+
+        <p class="date">Hôm nay, ngày ${today}, chúng tôi gồm các bên:</p>
+
+        <p><strong>BÊN CHO THUÊ (BÊN A): CHỦ PHÒNG TRỌ SMARTBOARDING</strong><br/>
+        Điện thoại: 0909xxxxxx</p>
+
+        <p><strong>BÊN THUÊ PHÒNG (BÊN B): ${contract.tenantName}</strong><br/>
+        Mã hợp đồng: ${contract.contractNumber}</p>
+
+        <p>Hai bên thống nhất ký kết hợp đồng thuê phòng với các điều khoản sau:</p>
+
+        <p class="section-title">Điều 1: Thông tin phòng thuê</p>
+        <p class="line">- Phòng số: ${contract.roomNumber} thuộc khu nhà trọ SmartBoarding</p>
+        <p class="line">- Tiền thuê phòng hàng tháng: ${contract.price.toLocaleString('vi-VN')} đ / tháng</p>
+        <p class="line">- Tiền đặt cọc: ${contract.roomDeposit.toLocaleString('vi-VN')} đ</p>
+
+        <p class="section-title">Điều 2: Thời hạn thuê và Thanh toán</p>
+        <p class="line">- Thời gian thuê bắt đầu từ: ${startDate} đến ngày ${endDate}</p>
+        <p class="line">- Ngày thu tiền phòng cố định hàng tháng: Ngày ${contract.paymentDate} hàng tháng.</p>
+
+        <p class="section-title">Điều 3: Điều khoản sử dụng và Cam kết</p>
+        <p class="line">- Bên B có trách nhiệm bảo quản tài sản phòng thuê, đóng tiền điện nước và dịch vụ đầy đủ hàng tháng, giữ gìn vệ sinh chung.</p>
+        <p class="line">- Hai bên cam kết thực hiện đúng các điều khoản trong hợp đồng. Mọi tranh chấp được giải quyết theo pháp luật Việt Nam.</p>
+
+        <div class="sign-row">
+          <div class="sign-col">
+            <p>ĐẠI DIỆN BÊN A (Ký tên)</p>
+            <small>(Chủ nhà trọ)</small>
+            <br/><br/><br/><br/>
+          </div>
+          <div class="sign-col">
+            <p>ĐẠI DIỆN BÊN B (Ký tên)</p>
+            <small>(Người thuê)</small>
+            <br/><br/><br/><br/>
+          </div>
+        </div>
+      </body>
+      </html>
+    `;
+
+    const win = window.open('', '_blank');
+    if (!win) {
+      toast.error('Trình duyệt đã chặn cửa sổ bật lên. Vui lòng cho phép popup!');
+      return;
+    }
+    win.document.write(html);
+    win.document.close();
+    win.focus();
+    setTimeout(() => {
+      win.print();
+    }, 500);
+  };
+
   // POST: Tạo hợp đồng mới
   const handleCreateContract = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -173,8 +266,8 @@ export default function ContractManagement() {
         setSelectedTenantId('');
         fetchData();
       } else {
-        const errorData = await response.json().catch(() => null);
-        toast.error(errorData?.message || 'Lỗi khi tạo hợp đồng!');
+        const errMsg = await parseApiError(response, 'Lỗi khi tạo hợp đồng!');
+        toast.error(errMsg);
       }
     } catch {
       toast.error('Lỗi kết nối đến server!');
@@ -195,11 +288,11 @@ export default function ContractManagement() {
         setSelectedContract(null);
         fetchData();
       } else {
-        const errorData = await response.json().catch(() => null);
-        toast.error(errorData?.message || 'Lỗi khi xử lý thanh lý!');
+        const errMsg = await parseApiError(response, 'Lỗi khi xử lý thanh lý!');
+        toast.error(errMsg);
       }
     } catch {
-      toast.error('Lỗi khi xử lý thanh lý!');
+      toast.error('Lỗi kết nối đến server!');
     }
   };
 
@@ -220,11 +313,11 @@ export default function ContractManagement() {
         setSelectedContract(null);
         fetchData();
       } else {
-        const errorData = await response.json().catch(() => null);
-        toast.error(errorData?.message || 'Lỗi khi xử lý gia hạn!');
+        const errMsg = await parseApiError(response, 'Lỗi khi xử lý gia hạn!');
+        toast.error(errMsg);
       }
     } catch {
-      toast.error('Lỗi khi xử lý gia hạn!');
+      toast.error('Lỗi kết nối đến server!');
     }
   };
 
@@ -449,8 +542,14 @@ export default function ContractManagement() {
                     <div><p className="text-gray-400 text-xs">Giá thuê phòng/tháng</p><p className="font-bold text-blue-600 text-lg">{selectedContract.price.toLocaleString('vi-VN')} ₫</p></div>
                     <div><p className="text-gray-400 text-xs">Tiền đặt cọc phòng</p><p className="font-bold text-gray-800 text-lg">{selectedContract.roomDeposit.toLocaleString('vi-VN')} ₫</p></div>
                   </div>
-                  <div className="flex gap-2 pt-2">
+                  <div className="flex gap-2 pt-2 flex-wrap">
                     <Dialog.Close className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 text-sm">Đóng</Dialog.Close>
+                    <button
+                      onClick={() => handleDownloadPDF(selectedContract)}
+                      className="px-4 py-2 bg-gray-800 text-white rounded-lg hover:bg-gray-900 text-sm flex items-center gap-1.5"
+                    >
+                      <Download className="w-4 h-4" /> Tải về PDF
+                    </button>
                     {selectedContract.status === 0 && (
                       <>
                         <button onClick={() => { setContractToTerminate(selectedContract); setIsTerminateDialogOpen(true); }} className="px-4 py-2 bg-red-50 text-red-700 border border-red-200 rounded-lg hover:bg-red-100 text-sm ml-auto">Thanh lý hợp đồng</button>
@@ -469,11 +568,11 @@ export default function ContractManagement() {
       <Dialog.Root open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
         <Dialog.Portal>
           <Dialog.Overlay className="fixed inset-0 bg-black/50 z-40" />
-          <Dialog.Content aria-describedby={undefined} className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-white rounded-lg p-6 w-full max-w-2xl max-h-[90vh] overflow-auto z-50 shadow-2xl text-sm">
+          <Dialog.Content aria-describedby={undefined} className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-white rounded-lg p-6 w-full max-w-xl max-h-[90vh] overflow-auto z-50 shadow-2xl text-sm">
             <Dialog.Title className="text-xl font-bold mb-4 border-b pb-2">
               Lập hợp đồng cho thuê mới
             </Dialog.Title>
-            <form className="space-y-4" onSubmit={handleCreateContract}>
+            <form className="space-y-5" onSubmit={handleCreateContract}>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="block font-medium mb-1 text-gray-700">Lựa chọn người thuê <span className="text-red-500">*</span></label>
@@ -490,7 +589,7 @@ export default function ContractManagement() {
                     if (room) setCreateFormData(prev => ({ ...prev, roomNumber: room.roomNumber, price: room.price }));
                   }} className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-white" required>
                     <option value="">-- Chọn số phòng --</option>
-                    {rooms.map(r => <option key={r.id} value={r.id}>Phòng {r.roomNumber} ({r.status === 0 ? 'Trống' : 'Đang thuê'})</option>)}
+                    {rooms.filter(r => r.status === 0).map(r => <option key={r.id} value={r.id}>Phòng {r.roomNumber}</option>)}
                   </select>
                 </div>
               </div>

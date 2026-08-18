@@ -2,9 +2,16 @@ import { useState, useEffect } from 'react';
 import { Search, Eye, QrCode, CheckCircle, Clock, XCircle, Trash2, Loader2, ChevronLeft, ChevronRight, ArrowUpDown, AlertCircle, Check, RotateCcw, X } from 'lucide-react';
 import * as Dialog from '@radix-ui/react-dialog';
 import { toast } from 'sonner';
-import { fetchApi, API_BASE_URL } from '../../api/fetchApi';
+import { fetchApi, API_BASE_URL, parseApiError } from '../../api/fetchApi';
 
 // Interface
+interface InvoiceItem {
+  name: string;
+  quantity: number;
+  unitPrice: number;
+  total: number;
+}
+
 interface Invoice {
   id: string;
   invoiceNumber: string;
@@ -28,6 +35,7 @@ interface Invoice {
   receiptImage?: string;
   type: number; // 0 = Rent, 1 = Deposit
   roomDeposit: number;
+  items?: InvoiceItem[];
 }
 
 interface RoomOption { id: string; roomNumber: string; price: number; }
@@ -71,21 +79,35 @@ export default function InvoiceManagement() {
   const [selectedTenantId, setSelectedTenantId] = useState('');
   const [createFormData, setCreateFormData] = useState(blankCreateFormData);
 
+
   // Tải dữ liệu ban đầu
   const loadInitialData = async () => {
     try {
       setIsLoading(true);
-      const [resInvoices, resRooms, resTenants] = await Promise.all([
-        fetchApi('/Invoices'),
+      const [resRooms, resTenants] = await Promise.all([
         fetchApi('/Rooms'),
         fetchApi('/Users'),
       ]);
 
-      if (resInvoices.ok) setInvoices(await resInvoices.json());
       if (resRooms.ok) setRooms(await resRooms.json());
       if (resTenants.ok) setTenants(await resTenants.json());
     } catch (error) {
-      toast.error('Lỗi khi tải dữ liệu từ server!');
+      toast.error('Lỗi khi tải danh mục phòng và khách thuê!');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const fetchInvoices = async () => {
+    try {
+      setIsLoading(true);
+      const resInvoices = await fetchApi('/Invoices');
+      if (resInvoices.ok) {
+        const data = await resInvoices.json();
+        setInvoices(data || []);
+      }
+    } catch (error) {
+      toast.error('Lỗi khi tải danh sách hóa đơn từ server!');
     } finally {
       setIsLoading(false);
     }
@@ -94,6 +116,10 @@ export default function InvoiceManagement() {
   useEffect(() => {
     loadInitialData();
   }, []);
+
+  useEffect(() => {
+    fetchInvoices();
+  }, [currentPage]);
 
   // Tự động điền số phòng và giá phòng
   useEffect(() => {
@@ -172,10 +198,10 @@ export default function InvoiceManagement() {
         setCreateFormData(blankCreateFormData);
         setSelectedRoomId('');
         setSelectedTenantId('');
-        loadInitialData();
+        fetchInvoices();
       } else {
-        const err = await response.json().catch(() => null);
-        toast.error(err?.message || 'Không thể lưu hóa đơn mới!');
+        const errMsg = await parseApiError(response, 'Không thể lưu hóa đơn mới!');
+        toast.error(errMsg);
       }
     } catch {
       toast.error('Lỗi kết nối đến máy chủ!');
@@ -190,10 +216,13 @@ export default function InvoiceManagement() {
         toast.success('Xác nhận thanh toán thành công!');
         setSelectedInvoice(null);
         setShowQRDialog(false);
-        loadInitialData();
-      } else throw new Error();
+        fetchInvoices();
+      } else {
+        const errMsg = await parseApiError(response, 'Cập nhật trạng thái thanh toán thất bại!');
+        toast.error(errMsg);
+      }
     } catch {
-      toast.error('Cập nhật trạng thái thanh toán thất bại!');
+      toast.error('Lỗi kết nối đến máy chủ!');
     }
   };
 
@@ -204,10 +233,10 @@ export default function InvoiceManagement() {
       if (response.ok) {
         toast.success('Xác nhận thanh toán thành công!');
         setSelectedInvoice(null);
-        loadInitialData();
+        fetchInvoices();
       } else {
-        const err = await response.json().catch(() => null);
-        toast.error(err?.message || 'Xác nhận thanh toán thất bại!');
+        const errMsg = await parseApiError(response, 'Xác nhận thanh toán thất bại!');
+        toast.error(errMsg);
       }
     } catch {
       toast.error('Lỗi kết nối đến máy chủ!');
@@ -221,10 +250,10 @@ export default function InvoiceManagement() {
       if (response.ok) {
         toast.success('Đã hủy hóa đơn thành công!');
         setSelectedInvoice(null);
-        loadInitialData();
+        fetchInvoices();
       } else {
-        const err = await response.json().catch(() => null);
-        toast.error(err?.message || 'Hủy hóa đơn thất bại!');
+        const errMsg = await parseApiError(response, 'Hủy hóa đơn thất bại!');
+        toast.error(errMsg);
       }
     } catch {
       toast.error('Lỗi kết nối đến máy chủ!');
@@ -238,10 +267,10 @@ export default function InvoiceManagement() {
       if (response.ok) {
         toast.success('Đã khôi phục hóa đơn thành công!');
         setSelectedInvoice(null);
-        loadInitialData();
+        fetchInvoices();
       } else {
-        const err = await response.json().catch(() => null);
-        toast.error(err?.message || 'Khôi phục hóa đơn thất bại!');
+        const errMsg = await parseApiError(response, 'Khôi phục hóa đơn thất bại!');
+        toast.error(errMsg);
       }
     } catch {
       toast.error('Lỗi kết nối đến máy chủ!');
@@ -257,10 +286,13 @@ export default function InvoiceManagement() {
         toast.success('Đã xóa hóa đơn vĩnh viễn thành công!');
         setIsDeleteDialogOpen(false);
         setInvoiceToDelete(null);
-        loadInitialData();
-      } else throw new Error();
+        fetchInvoices();
+      } else {
+        const errMsg = await parseApiError(response, 'Không thể xóa hóa đơn này!');
+        toast.error(errMsg);
+      }
     } catch {
-      toast.error('Không thể xóa hóa đơn này!');
+      toast.error('Lỗi kết nối đến máy chủ!');
     }
   };
 
@@ -299,7 +331,6 @@ export default function InvoiceManagement() {
       2: { icon: XCircle, className: 'bg-gray-100 text-gray-500' },         // Cancelled / Đã hủy
       3: { icon: Clock, className: 'bg-yellow-100 text-yellow-700' },       // Unpaid / Chờ thanh toán
       4: { icon: AlertCircle, className: 'bg-red-100 text-red-700' },        // Overdue / Quá hạn
-      5: { icon: CheckCircle, className: 'bg-purple-100 text-purple-700' }, // Partial / Thanh toán một phần
     };
     const config = configs[status] || { icon: Clock, className: 'bg-gray-100 text-gray-700' };
     const Icon = config.icon;
@@ -350,9 +381,7 @@ export default function InvoiceManagement() {
             <option value="0">Đang xử lý</option>
             <option value="3">Chờ thanh toán</option>
             <option value="1">Đã thanh toán</option>
-            <option value="4">Quá hạn</option>
             <option value="2">Đã hủy</option>
-            <option value="5">Thanh toán một phần</option>
           </select>
         </div>
       </div>
@@ -398,38 +427,6 @@ export default function InvoiceManagement() {
                         <td className="px-6 py-4">
                           <div className="flex items-center justify-center gap-1">
                             <button onClick={() => setSelectedInvoice(invoice)} className="p-2 hover:bg-gray-100 text-gray-600 rounded-md" title="Xem chi tiết"><Eye className="w-4 h-4" /></button>
-                            
-                            {/* Nút thao tác nhanh dựa trên trạng thái */}
-                            {[0, 3, 4].includes(invoice.status) && (
-                              <button 
-                                onClick={() => handleConfirmPayment(invoice.id)} 
-                                className="p-2 hover:bg-green-50 text-green-600 rounded-md" 
-                                title="Xác nhận thanh toán"
-                              >
-                                <Check className="w-4 h-4" />
-                              </button>
-                            )}
-
-                            {invoice.status === 0 && (
-                              <button 
-                                onClick={() => handleCancelInvoice(invoice.id)} 
-                                className="p-2 hover:bg-orange-50 text-orange-500 rounded-md" 
-                                title="Hủy hóa đơn"
-                              >
-                                <X className="w-4 h-4" />
-                              </button>
-                            )}
-
-                            {invoice.status === 2 && (
-                              <button 
-                                onClick={() => handleReactivateInvoice(invoice.id)} 
-                                className="p-2 hover:bg-blue-50 text-blue-600 rounded-md" 
-                                title="Khôi phục hóa đơn"
-                              >
-                                <RotateCcw className="w-4 h-4" />
-                              </button>
-                            )}
-
                             <button onClick={() => { setInvoiceToDelete(invoice); setIsDeleteDialogOpen(true); }} className="p-2 hover:bg-red-50 text-red-600 rounded-md" title="Xóa bỏ"><Trash2 className="w-4 h-4" /></button>
                           </div>
                         </td>
@@ -516,6 +513,19 @@ export default function InvoiceManagement() {
                       <div className="flex justify-between text-gray-600"><span>Tiền điện ({selectedInvoice.electricUsage} kWh × {selectedInvoice.electricPrice} ₫)</span><span>{selectedInvoice.electricTotal.toLocaleString('vi-VN')} ₫</span></div>
                       <div className="flex justify-between text-gray-600"><span>Tiền nước ({selectedInvoice.waterUsage} m³ × {selectedInvoice.waterPrice} ₫)</span><span>{selectedInvoice.waterTotal.toLocaleString('vi-VN')} ₫</span></div>
                       <div className="flex justify-between text-gray-600"><span>Phí quản lý dịch vụ cố định</span><span>{(selectedInvoice.serviceFee || 0).toLocaleString('vi-VN')} ₫</span></div>
+
+                      {selectedInvoice.items && selectedInvoice.items.length > 0 && (
+                        <div className="space-y-1.5 border-t border-dashed border-gray-300 pt-2 mt-2">
+                          <div className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1">Dịch vụ & Phụ phí khác</div>
+                          {selectedInvoice.items.map((item, idx) => (
+                            <div key={idx} className="flex justify-between text-sm text-gray-600">
+                              <span>• {item.name} {item.quantity > 1 ? `(x${item.quantity})` : ''}</span>
+                              <span>{(item.total || (item.quantity * item.unitPrice) || 0).toLocaleString('vi-VN')} ₫</span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+
                       <div className="flex justify-between pt-3 border-t border-gray-500 text-base font-bold text-gray-900">
                         <span>Tổng chi phí cần thanh toán</span>
                         <span className="text-blue-600">{(selectedInvoice.amount || 0).toLocaleString('vi-VN')} ₫</span>
@@ -540,7 +550,7 @@ export default function InvoiceManagement() {
                   <div className="flex gap-2 pt-2 border-t border-gray-400">
                     <Dialog.Close className="flex-1 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 font-medium text-center">Đóng</Dialog.Close>
                     
-                    {selectedInvoice.status === 0 && (
+                    {[0, 3].includes(selectedInvoice.status) && (
                       <button 
                         onClick={() => handleCancelInvoice(selectedInvoice.id)} 
                         className="px-4 py-2 bg-orange-600 text-white rounded-lg font-medium hover:bg-orange-700 transition-colors"
@@ -558,7 +568,7 @@ export default function InvoiceManagement() {
                       </button>
                     )}
 
-                    {[0, 3, 4].includes(selectedInvoice.status) && (
+                    {[0, 3].includes(selectedInvoice.status) && (
                       <button 
                         onClick={() => handleConfirmPayment(selectedInvoice.id)} 
                         className="px-4 py-2 bg-green-600 text-white rounded-lg font-medium hover:bg-green-700 transition-colors"

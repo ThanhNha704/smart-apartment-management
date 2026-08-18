@@ -39,3 +39,55 @@ export const fetchApi = async (endpoint: string, options: RequestInit = {}): Pro
 
   return response;
 };
+
+/**
+ * Đọc thông báo lỗi động từ Response của backend.
+ * Hỗ trợ các dạng:
+ *   - string (text/plain)
+ *   - { message: string }
+ *   - string[]   (mảng lỗi validation)
+ *   - { errors: string[] }
+ *   - { title: string }  (ASP.NET ProblemDetails)
+ */
+export const parseApiError = async (
+  response: Response,
+  fallback = 'Đã xảy ra lỗi, vui lòng thử lại!'
+): Promise<string> => {
+  try {
+    const contentType = response.headers.get('content-type') || '';
+    if (contentType.includes('application/json')) {
+      const data = await response.json();
+
+      // Mảng string: ["Lỗi 1", "Lỗi 2"]
+      if (Array.isArray(data)) {
+        return data.filter(Boolean).join('\n') || fallback;
+      }
+
+      // { errors: ["..."] }
+      if (data?.errors && Array.isArray(data.errors)) {
+        return data.errors.filter(Boolean).join('\n') || fallback;
+      }
+
+      // { message: "..." }
+      if (typeof data?.message === 'string' && data.message) {
+        return data.message;
+      }
+
+      // ASP.NET ProblemDetails: { title: "..." }
+      if (typeof data?.title === 'string' && data.title) {
+        return data.title;
+      }
+
+      // Chuỗi JSON đơn giản
+      if (typeof data === 'string' && data) {
+        return data;
+      }
+    } else {
+      const text = await response.text();
+      if (text) return text;
+    }
+  } catch {
+    // ignore parse error
+  }
+  return fallback;
+};

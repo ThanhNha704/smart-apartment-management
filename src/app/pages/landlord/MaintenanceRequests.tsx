@@ -11,7 +11,7 @@ import {
 } from "lucide-react";
 import * as Dialog from "@radix-ui/react-dialog";
 import { toast } from "sonner";
-import { fetchApi } from "../../api/fetchApi";
+import { fetchApi, parseApiError } from "../../api/fetchApi";
 
 // INTERFACES
 interface MaintenanceItem {
@@ -61,7 +61,7 @@ export default function MaintenanceRequests() {
   const fetchRequests = async () => {
     try {
       setIsLoading(true);
-      const response = await fetchApi("/MaintenanceRequests");
+      const response = await fetchApi(`/MaintenanceRequests?page=${currentPage}&limit=${itemsPerPage}`);
 
       if (!response.ok) throw new Error("Không thể tải dữ liệu");
 
@@ -77,7 +77,7 @@ export default function MaintenanceRequests() {
 
   useEffect(() => {
     fetchRequests();
-  }, []);
+  }, [currentPage]);
 
   // Đồng bộ ghi chú khi chọn một yêu cầu
   useEffect(() => {
@@ -137,9 +137,7 @@ export default function MaintenanceRequests() {
           };
         });
       } else {
-        const errorData = await response.json().catch(() => null);
-        const errMsg =
-          errorData?.message || errorData?.title || "Lỗi khi lưu ghi chú!";
+        const errMsg = await parseApiError(response, "Lỗi khi lưu ghi chú!");
         toast.error(errMsg);
       }
     } catch (error) {
@@ -167,11 +165,12 @@ export default function MaintenanceRequests() {
         setSelectedRequest(null);
         fetchRequests();
       } else {
-        throw new Error("Cập nhật thất bại");
+        const errMsg = await parseApiError(response, "Lỗi khi cập nhật trạng thái xử lý!");
+        toast.error(errMsg);
       }
     } catch (error) {
-      console.error(error);
-      toast.error("Lỗi khi cập nhật trạng thái xử lý!");
+      console.error("Lỗi khi bắt đầu xử lý:", error);
+      toast.error("Đã xảy ra lỗi không mong muốn!");
     }
   };
 
@@ -187,11 +186,12 @@ export default function MaintenanceRequests() {
         setSelectedRequest(null);
         fetchRequests();
       } else {
-        throw new Error("Cập nhật thất bại");
+        const errMsg = await parseApiError(response, "Lỗi khi hoàn thành yêu cầu sửa chữa!");
+        toast.error(errMsg);
       }
     } catch (error) {
-      console.error(error);
-      toast.error("Lỗi khi hoàn thành yêu cầu sửa chữa!");
+      console.error("Lỗi khi hoàn thành yêu cầu:", error);
+      toast.error("Đã xảy ra lỗi không mong muốn!");
     }
   };
 
@@ -248,15 +248,12 @@ export default function MaintenanceRequests() {
     });
   }, [apiData, searchTerm, filterStatus, filterPriority, sortBy]);
 
-  // TÍNH TOÁN DỮ LIỆU PHÂN TRANG
-  const totalItems = processedRequests.length;
-  const totalPages = Math.ceil(totalItems / itemsPerPage);
+  // TÍNH TOÁN DỮ LIỆU PHÂN TRANG (đã được phân trang phía server)
+  const totalItems = apiData?.total || 0;
+  const totalPages = Math.ceil(totalItems / itemsPerPage) || 1;
   const indexOfLastItem = currentPage * itemsPerPage;
   const indexOfFirstItem = indexOfLastItem - itemsPerPage;
-  const currentRequests = processedRequests.slice(
-    indexOfFirstItem,
-    indexOfLastItem,
-  );
+  const currentRequests = processedRequests;
 
   const getStatusBadge = (status: number, label: string) => {
     const configs = {

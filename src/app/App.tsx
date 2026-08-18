@@ -19,6 +19,7 @@ import MaintenanceRequests from './pages/landlord/MaintenanceRequests';
 // import Messages from './pages/landlord/ChatManagement';
 import Messages from './pages/AdminChat/AdminChat';
 import Notification from './pages/landlord/NotificationManagement';
+import ItemFeeManagement from './pages/landlord/ItemFeeManagement';
 // import Settings from './components/landlord/Settings';
 
 function ProtectedRoute({ children }: { children: React.ReactNode; }) {
@@ -58,6 +59,7 @@ function LandlordLayout() {
           <Route path="/maintenance" element={<MaintenanceRequests />} />
           <Route path="/messages" element={<Messages />} />
           <Route path="/notification" element={<Notification />} />
+          <Route path="/fees" element={<ItemFeeManagement />} />
           {/* <Route path="/settings" element={<Settings />} /> */}
           {/* Tự động redirect các route không tồn tại trong dashboard về trang chủ */}
           <Route path="*" element={<Navigate to="/dashboard" replace />} />

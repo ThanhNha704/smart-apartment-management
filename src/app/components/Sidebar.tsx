@@ -13,6 +13,7 @@ import {
   FileSignature,
   Wrench,
   LogOut,
+  Coins,
 } from "lucide-react";
 import { useAuth } from "../contexts/AuthContext";
 import { toast } from "sonner";
@@ -32,6 +33,7 @@ const menuItems = [
   { path: "/tenants", icon: Users, label: "Người thuê" },
   { path: "/contracts", icon: FileSignature, label: "Hợp đồng" },
   { path: "/invoices", icon: FileText, label: "Hóa đơn" },
+  { path: "/fees", icon: Coins, label: "Khoản phí phụ" },
   { path: "/meter-reading", icon: Gauge, label: "Lịch sử công tơ" },
   { path: "/maintenance", icon: Wrench, label: "Yêu cầu sửa chữa" },
 ];

@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { Plus, Edit, Trash2, Building2, DoorOpen, Users, ArrowUpDown, ChevronLeft, ChevronRight } from 'lucide-react';
 import * as Dialog from '@radix-ui/react-dialog';
 import { toast } from 'sonner';
-import { fetchApi } from '../../api/fetchApi';
+import { fetchApi, parseApiError } from '../../api/fetchApi';
 
 // Định nghĩa Interface
 interface FloorItem {
@@ -139,8 +139,7 @@ export default function FloorManagement() {
         setAddFormData({ floorNumber: '', name: '', description: '' });
         fetchFloors();
       } else {
-        const errorData = await response.json().catch(() => null);
-        const errMsg = errorData?.join?.(', ') || 'Thêm tầng thất bại. Vui lòng thử lại!';
+        const errMsg = await parseApiError(response, 'Thêm tầng thất bại. Vui lòng thử lại!');
         toast.error(errMsg);
       }
     } catch (error) {
@@ -184,8 +183,7 @@ export default function FloorManagement() {
         setSelectedFloor(null);
         fetchFloors();
       } else {
-        const errorData = await response.json().catch(() => null);
-        const errMsg = errorData?.join?.(', ') || 'Cập nhật thất bại!';
+        const errMsg = await parseApiError(response, 'Cập nhật thất bại!');
         toast.error(errMsg);
       }
     } catch (error) {
@@ -207,11 +205,11 @@ export default function FloorManagement() {
         setFloorToDelete(null);
         fetchFloors();
       } else {
-        throw new Error('Xóa thất bại');
+        const errMsg = await parseApiError(response, 'K hông thể xóa tầng này!');
+        toast.error(errMsg);
       }
     } catch (error) {
-      console.error(error);
-      toast.error('Không thể xóa tầng này (Có thể liên quan đến ràng buộc dữ liệu hợp đồng).');
+      toast.error('Lỗi kết nối đến server!');
     }
   };
 

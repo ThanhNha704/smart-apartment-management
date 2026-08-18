@@ -15,7 +15,7 @@ import {
 } from "lucide-react";
 import * as Dialog from "@radix-ui/react-dialog";
 import { toast } from "sonner";
-import { fetchApi } from "../../api/fetchApi";
+import { fetchApi, parseApiError } from "../../api/fetchApi";
 
 // Định nghĩa trạng thái phòng
 const RoomStatus = {
@@ -37,6 +37,13 @@ type SortKey =
 type SortDirection = "asc" | "desc";
 
 // Interface
+interface RoomAmenity {
+  name: string;
+  price: number;
+  unit: string;
+  type: string;
+}
+
 interface Room {
   id: string;
   createdAt: string;
@@ -51,6 +58,7 @@ interface Room {
   status: RoomStatus;
   statusLabel: string;
   tenantName: string | null;
+  amenities?: RoomAmenity[];
 }
 
 interface FloorItem {
@@ -74,6 +82,7 @@ export default function RoomManagement() {
   const [rooms, setRooms] = useState<Room[]>([]);
   const [floors, setFloors] = useState<FloorItem[]>([]);
   const [tenants, setTenants] = useState<UserItem[]>([]);
+  const [itemFees, setItemFees] = useState<any[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [filterStatus, setFilterStatus] = useState<string>("all");
@@ -101,6 +110,7 @@ export default function RoomManagement() {
     roomDeposit: 0,
     floorId: "",
     description: "",
+    amenities: [] as string[],
   });
 
   // State quản lý Form hợp đồng
@@ -131,6 +141,13 @@ export default function RoomManagement() {
       if (!usersRes.ok) throw new Error("Không thể tải danh sách khách hàng");
       const usersData = await usersRes.json();
       setTenants(usersData || []);
+
+      const feesRes = await fetchApi("/ItemFee");
+      if (feesRes.ok) {
+        const feesData = await feesRes.json();
+        // Lọc các khoản phí đang hoạt động và không phải là bắt buộc
+        setItemFees(feesData.filter((f: any) => f.isActive && f.type !== "mandatory") || []);
+      }
     } catch (error) {
       console.error("Lỗi lấy dữ liệu từ backend:", error);
       toast.error("Không thể kết nối đến hệ thống backend để tải dữ liệu!");
@@ -177,14 +194,11 @@ export default function RoomManagement() {
           roomDeposit: 0,
           floorId: "",
           description: "",
+          amenities: [],
         });
         fetchData();
       } else {
-        const errorData = await response.json().catch(() => null);
-        const errMsg =
-          errorData?.join?.(", ") ||
-          errorData?.message ||
-          "Lỗi khi thêm phòng mới!";
+        const errMsg = await parseApiError(response, "Lỗi khi thêm phòng mới!");
         toast.error(errMsg);
       }
     } catch (error) {
@@ -214,11 +228,7 @@ export default function RoomManagement() {
         setSelectedRoom(null);
         fetchData();
       } else {
-        const errorData = await response.json().catch(() => null);
-        const errMsg =
-          errorData?.join?.(", ") ||
-          errorData?.message ||
-          "Cập nhật thông tin thất bại!";
+        const errMsg = await parseApiError(response, "Cập nhật thông tin thất bại!");
         toast.error(errMsg);
       }
     } catch (error) {
@@ -258,11 +268,7 @@ export default function RoomManagement() {
         setSelectedRoom(null);
         fetchData();
       } else {
-        const errorData = await response.json().catch(() => null);
-        const errMsg =
-          errorData?.join?.(", ") ||
-          errorData?.message ||
-          "Không thể tạo hợp đồng cho thuê!";
+        const errMsg = await parseApiError(response, "Không thể tạo hợp đồng cho thuê!");
         toast.error(errMsg);
       }
     } catch (error) {
@@ -285,7 +291,8 @@ export default function RoomManagement() {
         setRoomToDelete(null);
         fetchData();
       } else {
-        throw new Error("Xóa thất bại");
+        const errMsg = await parseApiError(response, "Không thể xóa phòng này!");
+        toast.error(errMsg);
       }
     } catch (error) {
       console.error(error);
@@ -311,6 +318,7 @@ export default function RoomManagement() {
       roomDeposit: room.roomDeposit,
       floorId: matchedFloor?.id || "",
       description: room.description || "",
+      amenities: (room.amenities || []).map((a: any) => typeof a === "string" ? a : a.type),
     });
     setIsEditDialogOpen(true);
   };
@@ -430,6 +438,7 @@ export default function RoomManagement() {
                   roomDeposit: 0,
                   floorId: "",
                   description: "",
+                  amenities: [],
                 });
                 setIsAddDialogOpen(true);
               }}
@@ -549,6 +558,27 @@ export default function RoomManagement() {
                           <span className="font-medium">
                             {room.roomDeposit.toLocaleString("vi-VN")} ₫
                           </span>
+                        </div>
+
+                        <div className="flex flex-col gap-1 pt-1.5 border-t border-dashed border-gray-100 mt-1.5">
+                          <span className="text-xs text-gray-500 font-semibold">Dịch vụ đăng ký:</span>
+                          {room.amenities && room.amenities.length > 0 ? (
+                            <div className="flex flex-wrap gap-1">
+                              {room.amenities.map((amenity, index) => {
+                                const name = typeof amenity === 'string' ? amenity : amenity.name;
+                                const titleInfo = typeof amenity === 'string' 
+                                  ? amenity 
+                                  : `${amenity.name} (${amenity.price.toLocaleString("vi-VN")} ₫/${amenity.unit})`;
+                                return (
+                                  <span key={index} className="px-2 py-0.5 bg-blue-50 text-blue-700 text-[10px] font-bold rounded border border-blue-200" title={titleInfo}>
+                                    {name}
+                                  </span>
+                                );
+                              })}
+                            </div>
+                          ) : (
+                            <span className="text-xs text-gray-400 italic">Chưa đăng ký dịch vụ phụ</span>
+                          )}
                         </div>
                       </div>
                     </div>
@@ -837,6 +867,38 @@ export default function RoomManagement() {
                   placeholder="Ví dụ: Vị trí, trang thiết bị đi kèm..."
                 />
               </div>
+
+              {itemFees.length > 0 && (
+                <div>
+                  <label className="block text-sm font-medium mb-1.5">
+                    Đăng ký dịch vụ / Phụ phí phòng trọ
+                  </label>
+                  <div className="grid grid-cols-2 gap-2.5 border border-gray-200 rounded-lg p-3 max-h-36 overflow-y-auto bg-gray-50/50">
+                    {itemFees.map((fee) => {
+                      const isChecked = roomFormData.amenities?.includes(fee.type);
+                      return (
+                        <label key={fee.id} className="flex items-center gap-2 text-xs text-gray-700 cursor-pointer select-none">
+                          <input
+                            type="checkbox"
+                            checked={isChecked}
+                            onChange={(e) => {
+                              const checked = e.target.checked;
+                              const updated = checked
+                                ? [...(roomFormData.amenities || []), fee.type]
+                                : (roomFormData.amenities || []).filter((t: string) => t !== fee.type);
+                              setRoomFormData({ ...roomFormData, amenities: updated });
+                            }}
+                            className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                          />
+                          <span className="truncate" title={`${fee.name} (${fee.price.toLocaleString('vi-VN')} ₫)`}>
+                            {fee.name}
+                          </span>
+                        </label>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
               <div className="flex gap-2 pt-2">
                 <Dialog.Close className="flex-1 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
                   Hủy
@@ -992,6 +1054,38 @@ export default function RoomManagement() {
                   rows={2}
                 />
               </div>
+
+              {itemFees.length > 0 && (
+                <div>
+                  <label className="block text-sm font-medium mb-1.5">
+                    Đăng ký dịch vụ / Phụ phí phòng trọ
+                  </label>
+                  <div className="grid grid-cols-2 gap-2.5 border border-gray-200 rounded-lg p-3 max-h-36 overflow-y-auto bg-gray-50/50">
+                    {itemFees.map((fee) => {
+                      const isChecked = roomFormData.amenities?.includes(fee.type);
+                      return (
+                        <label key={fee.id} className="flex items-center gap-2 text-xs text-gray-700 cursor-pointer select-none">
+                          <input
+                            type="checkbox"
+                            checked={isChecked}
+                            onChange={(e) => {
+                              const checked = e.target.checked;
+                              const updated = checked
+                                ? [...(roomFormData.amenities || []), fee.type]
+                                : (roomFormData.amenities || []).filter((t: string) => t !== fee.type);
+                              setRoomFormData({ ...roomFormData, amenities: updated });
+                            }}
+                            className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                          />
+                          <span className="truncate" title={`${fee.name} (${fee.price.toLocaleString('vi-VN')} ₫)`}>
+                            {fee.name}
+                          </span>
+                        </label>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
               <div className="flex gap-2 pt-2">
                 <Dialog.Close className="flex-1 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
                   Hủy
