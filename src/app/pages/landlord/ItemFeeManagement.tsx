@@ -34,7 +34,6 @@ export default function ItemFeeManagement() {
 
     // Form state
     const [formData, setFormData] = useState(blankFormData);
-    const [isCustomType, setIsCustomType] = useState(false);
     const [customTypeVal, setCustomTypeVal] = useState('');
     const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -59,7 +58,6 @@ export default function ItemFeeManagement() {
     const handleOpenAdd = () => {
         setSelectedFee(null);
         setFormData(blankFormData);
-        setIsCustomType(false);
         setCustomTypeVal('');
         setIsOpen(true);
     };
@@ -74,7 +72,6 @@ export default function ItemFeeManagement() {
             type: isPreset ? fee.type : 'custom',
             isActive: fee.isActive
         });
-        setIsCustomType(!isPreset);
         setCustomTypeVal(isPreset ? '' : fee.type);
         setIsOpen(true);
     };
