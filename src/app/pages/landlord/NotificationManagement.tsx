@@ -13,6 +13,7 @@ import {
   Volume2,
   Inbox,
   MessageSquare,
+  Eye,
 } from "lucide-react";
 import { toast } from "sonner";
 import { fetchApi, parseApiError } from "../../api/fetchApi";
@@ -36,11 +37,25 @@ interface NotificationItem {
 export const triggerNotificationUpdate = () => {
   window.dispatchEvent(new Event("notification-updated"));
 };
+interface GroupDetailItem {
+  tenantId: string;
+  tenantName: string;
+  roomNumber: string;
+  isRead: boolean;
+  readAt: string | null;
+  createdAt: string;
+}
 
 export default function NotificationManagement() {
   const navigate = useNavigate();
   const [users, setUsers] = useState<{ id: string; name: string }[]>([]);
   const [allNotifications, setAllNotifications] = useState<NotificationItem[]>([]);
+
+  // Modal Chi tiết nhóm thông báo
+  const [isDetailOpen, setIsDetailOpen] = useState(false);
+  const [selectedNotif, setSelectedNotif] = useState<NotificationItem | null>(null);
+  const [groupDetails, setGroupDetails] = useState<GroupDetailItem[]>([]);
+  const [isDetailsLoading, setIsDetailsLoading] = useState(false);
 
   // Bộ lọc & Phân trang
   const [page, setPage] = useState(1);
@@ -55,8 +70,6 @@ export default function NotificationManagement() {
   const [body, setBody] = useState("");
   const [type, setType] = useState<number>(0);
   const [refModel, setRefModel] = useState("");
-  const [metaKey, setMetaKey] = useState("");
-  const [metaValue, setMetaValue] = useState("");
 
   // Loading states
   const [isLoading, setIsLoading] = useState(false);
@@ -144,11 +157,6 @@ export default function NotificationManagement() {
     try {
       setIsSending(true);
 
-      const metaObj: Record<string, string> = {};
-      if (metaKey.trim() && metaValue.trim()) {
-        metaObj[metaKey.trim()] = metaValue.trim();
-      }
-
       const payload = {
         tenantId: tenantId.trim() || null,
         title: title.trim(),
@@ -156,7 +164,7 @@ export default function NotificationManagement() {
         type: type,
         refId: null,
         refModel: refModel.trim() || null,
-        meta: metaObj,
+        meta: null,
       };
 
       const response = await fetchApi("/Notification", {
@@ -171,8 +179,6 @@ export default function NotificationManagement() {
         setBody("");
         setType(0);
         setRefModel("");
-        setMetaKey("");
-        setMetaValue("");
         setIsFormOpen(false);
 
         setPage(1);
@@ -242,6 +248,26 @@ export default function NotificationManagement() {
     } catch (error) {
       console.error(error);
       toast.error("Lỗi khi đồng bộ đánh dấu đọc tất cả!");
+    }
+  };
+
+  const handleShowGroupDetails = async (notif: NotificationItem) => {
+    setSelectedNotif(notif);
+    setIsDetailOpen(true);
+    setIsDetailsLoading(true);
+    try {
+      const response = await fetchApi(`/Notification/group-detail/${notif.id}`);
+      if (response.ok) {
+        const data = await response.json();
+        setGroupDetails(data);
+      } else {
+        toast.error("Không thể tải chi tiết người nhận");
+      }
+    } catch (err) {
+      console.error(err);
+      toast.error("Lỗi kết nối khi tải chi tiết");
+    } finally {
+      setIsDetailsLoading(false);
     }
   };
 
@@ -472,6 +498,13 @@ export default function NotificationManagement() {
                 className="flex items-center gap-2 w-full md:w-auto border-t md:border-t-0 pt-3 md:pt-0 justify-end"
                 onClick={(e) => e.stopPropagation()}
               >
+                <button
+                  onClick={() => handleShowGroupDetails(notif)}
+                  className="flex-1 md:flex-none px-4 py-2 border border-gray-200 text-gray-700 hover:bg-gray-50 rounded-lg text-sm font-medium flex items-center justify-center gap-1.5 transition-colors"
+                >
+                  <Eye className="w-4 h-4" />
+                  Xem chi tiết
+                </button>
                 {!notif.isReadAdmin && (
                   <button
                     onClick={() => handleMarkAsRead(notif.id)}
@@ -605,28 +638,6 @@ export default function NotificationManagement() {
                 </div>
               </div>
 
-              <div>
-                <label className="block text-xs font-semibold text-gray-700 uppercase tracking-wider mb-1.5">
-                  Metadata Key/Val (Tùy chọn)
-                </label>
-                <div className="flex gap-1.5">
-                  <input
-                    type="text"
-                    value={metaKey}
-                    onChange={(e) => setMetaKey(e.target.value)}
-                    placeholder="Key (ví dụ: source)"
-                    className="w-1/2 px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-1 focus:ring-black focus:outline-none"
-                  />
-                  <input
-                    type="text"
-                    value={metaValue}
-                    onChange={(e) => setMetaValue(e.target.value)}
-                    placeholder="Value (ví dụ: system_alert)"
-                    className="w-1/2 px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-1 focus:ring-black focus:outline-none"
-                  />
-                </div>
-              </div>
-
               <div className="pt-4 border-t border-gray-100 flex justify-end gap-2">
                 <button
                   type="button"
@@ -649,6 +660,105 @@ export default function NotificationManagement() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL CHI TIẾT NGƯỜI NHẬN */}
+      {isDetailOpen && selectedNotif && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 animate-fade-in">
+          <div className="bg-white rounded-2xl w-full max-w-2xl shadow-xl overflow-hidden border border-gray-100 animate-slide-up flex flex-col max-h-[85vh]">
+            <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between bg-gray-50">
+              <div>
+                <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2">
+                  <Eye className="w-5 h-5 text-blue-600" />
+                  Danh sách người nhận thông báo
+                </h3>
+                <p className="text-xs text-gray-500 mt-0.5 truncate max-w-lg">
+                  Tiêu đề: {selectedNotif.title}
+                </p>
+              </div>
+              <button
+                onClick={() => {
+                  setIsDetailOpen(false);
+                  setGroupDetails([]);
+                }}
+                className="p-1.5 hover:bg-gray-200 rounded-full transition-colors"
+              >
+                <X className="w-5 h-5 text-gray-500" />
+              </button>
+            </div>
+
+            <div className="p-6 overflow-y-auto flex-1">
+              {isDetailsLoading ? (
+                <div className="flex flex-col items-center justify-center py-12">
+                  <Loader2 className="w-8 h-8 animate-spin text-blue-600 mb-2" />
+                  <p className="text-sm text-gray-500">Đang tải danh sách cư dân...</p>
+                </div>
+              ) : groupDetails.length === 0 ? (
+                <div className="text-center py-12 text-gray-500 text-sm">
+                  Không tìm thấy thông tin người nhận
+                </div>
+              ) : (
+                <div className="border border-gray-100 rounded-xl overflow-hidden shadow-sm">
+                  <table className="w-full text-left border-collapse text-sm">
+                    <thead>
+                      <tr className="bg-gray-50 border-b border-gray-100 text-gray-700 font-semibold">
+                        <th className="p-3">Họ và tên</th>
+                        <th className="p-3">Số phòng</th>
+                        <th className="p-3">Thời gian nhận</th>
+                        <th className="p-3">Cư dân đọc</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-50">
+                      {groupDetails.map((item, idx) => (
+                        <tr key={idx} className="hover:bg-gray-50/50 transition-colors">
+                          <td className="p-3 font-medium text-gray-900">{item.tenantName}</td>
+                          <td className="p-3">
+                            <span className="bg-blue-50 text-blue-700 text-xs px-2 py-0.5 rounded font-semibold">
+                              {item.roomNumber}
+                            </span>
+                          </td>
+                          <td className="p-3 text-gray-500 text-xs">
+                            {new Date(item.createdAt).toLocaleString("vi-VN")}
+                          </td>
+                          <td className="p-3">
+                            <span
+                              className={`inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-full font-medium ${
+                                item.isRead
+                                  ? "bg-green-50 text-green-700 border border-green-200"
+                                  : "bg-gray-50 text-gray-500 border border-gray-200"
+                              }`}
+                            >
+                              {item.isRead ? (
+                                <>
+                                  <CheckCheck className="w-3 h-3 text-green-500" />
+                                  Đã đọc
+                                </>
+                              ) : (
+                                "Chưa đọc"
+                              )}
+                            </span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+
+            <div className="px-6 py-4 bg-gray-50 border-t border-gray-100 flex justify-end">
+              <button
+                onClick={() => {
+                  setIsDetailOpen(false);
+                  setGroupDetails([]);
+                }}
+                className="px-4 py-2 bg-white hover:bg-gray-100 border border-gray-200 rounded-lg text-sm font-semibold text-gray-700 transition-colors shadow-sm"
+              >
+                Đóng
+              </button>
+            </div>
           </div>
         </div>
       )}

@@ -422,7 +422,7 @@ export default function FloorManagement() {
                   value={addFormData.name}
                   onChange={(e) => setAddFormData({ ...addFormData, name: e.target.value })}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-black"
-                  placeholder="Ví dụ: Lầu 5 (Mặc định: Tầng + Số tầng)"
+                  placeholder="Ví dụ: Tầng 5 (Mặc định: Tầng + Số tầng)"
                 />
               </div>
               <div>

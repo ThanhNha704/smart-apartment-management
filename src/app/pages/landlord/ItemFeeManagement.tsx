@@ -16,7 +16,7 @@ interface ItemFee {
 
 const blankFormData = {
     name: '',
-    price: 0,
+    price: '' as string | number,
     unit: 'tháng',
     type: '',
     isActive: true
@@ -83,7 +83,8 @@ export default function ItemFeeManagement() {
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!formData.name.trim() || formData.price < 0 || isSubmitting) return;
+        const priceNum = formData.price === '' ? 0 : Number(formData.price);
+        if (!formData.name.trim() || priceNum < 0 || isSubmitting) return;
 
         const finalType = formData.type === 'custom' ? customTypeVal.trim() : formData.type;
         if (!finalType) {
@@ -101,6 +102,7 @@ export default function ItemFeeManagement() {
                 method,
                 body: JSON.stringify({
                     ...formData,
+                    price: formData.price === '' ? 0 : Number(formData.price),
                     type: finalType
                 })
             });
@@ -291,7 +293,8 @@ export default function ItemFeeManagement() {
                                         required
                                         min={0}
                                         value={formData.price}
-                                        onChange={(e) => setFormData({ ...formData, price: Number(e.target.value) })}
+                                        onChange={(e) => setFormData({ ...formData, price: e.target.value === '' ? '' : Number(e.target.value) })}
+                                        placeholder="Ví dụ: 100000"
                                         className="w-full px-3.5 py-2 border border-gray-200 rounded-lg text-sm focus:ring-1 focus:ring-black focus:outline-none font-semibold text-blue-600"
                                     />
                                 </div>
